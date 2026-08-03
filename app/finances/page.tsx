@@ -122,7 +122,6 @@ export default function FinancesPage() {
   async function loadCash() {
     const { data: balances } = await supabase.from("cash_balance").select("*")
     if (balances) {
-      setCashAZN(balances.find((c: any) => c.currency === "AZN")?.amount ?? 0)
       setCashUSD(balances.find((c: any) => c.currency === "USD")?.amount ?? 0)
     }
     let allTxData: any[] = []
@@ -134,6 +133,13 @@ export default function FinancesPage() {
       if (txChunk.length < 1000) break
       txFrom += 1000
     }
+    // Always calculate AZN balance from transactions — never trust cash_balance table
+    const realBalance = allTxData
+      .filter(t => t.currency === "AZN")
+      .reduce((s: number, t: any) => t.operation === "add" ? s + t.amount : s - t.amount, 0)
+    setCashAZN(Math.max(0, realBalance))
+    // Also sync cash_balance table so it stays correct
+    await supabase.from("cash_balance").update({ amount: Math.max(0, realBalance), updated_at: new Date().toISOString() }).eq("currency", "AZN")
     setCashHistory(allTxData)
     // Load custom categories
     const { data: cats } = await supabase.from("expense_categories").select("name").order("created_at", { ascending: true })
