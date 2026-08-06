@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { supabase } from "@/lib/supabase"
 import { useUserRole } from "@/lib/hooks/useUserRole"
 import { formatCurrency, formatDate } from "@/lib/calculations"
-import { CheckCircle, XCircle, Eye, Clock } from "lucide-react"
+import { CheckCircle, XCircle, Eye, Clock, Edit3, Send } from "lucide-react"
 
 const card = { background: "var(--bg-card)", border: "1px solid var(--border-color)", backdropFilter: "blur(20px)", borderRadius: "24px" }
 const modalCard = { background: "var(--bg-secondary)", border: "1px solid var(--border-color)", borderRadius: "24px" }
@@ -17,6 +17,9 @@ export default function DraftsPage() {
   const [selected, setSelected] = useState<any>(null)
   const [reviewNote, setReviewNote] = useState("")
   const [ready, setReady] = useState(false)
+  const [editDraft, setEditDraft] = useState<any>(null)
+  const [editForm, setEditForm] = useState<any>({})
+  const [resubmitting, setResubmitting] = useState(false)
 
   useEffect(() => { fetchDrafts(); setReady(true) }, [profile])
 
@@ -44,6 +47,50 @@ export default function DraftsPage() {
   async function handleDelete(id: string) {
     if (!confirm("Silinsin?")) return
     await supabase.from("booking_drafts").delete().eq("id", id); fetchDrafts()
+  }
+
+  function openEditDraft(draft: any) {
+    setEditForm({
+      client_name: draft.client_name ?? "",
+      client_phone: draft.client_phone ?? "",
+      destination: draft.destination ?? "",
+      departure_date: draft.departure_date ?? "",
+      return_date: draft.return_date ?? "",
+      travelers: draft.travelers ?? 1,
+      booking_type: draft.booking_type ?? "bilet",
+      buy_price: draft.buy_price ?? 0,
+      sell_price: draft.sell_price ?? 0,
+      commission_percent: draft.commission_percent ?? 10,
+      vendor: draft.vendor ?? "",
+      pnr: draft.pnr ?? "",
+      ticket_number: draft.ticket_number ?? "",
+      notes: draft.notes ?? "",
+      description: draft.description ?? "",
+    })
+    setEditDraft(draft)
+    setSelected(null)
+  }
+
+  async function handleResubmit() {
+    if (!editDraft) return
+    setResubmitting(true)
+    const gross = editForm.sell_price - editForm.buy_price
+    const commissionAmount = Math.round(gross * (editForm.commission_percent / 100) * 100) / 100
+    const profit = gross - commissionAmount
+    await supabase.from("booking_drafts").update({
+      ...editForm,
+      buy_price: Number(editForm.buy_price),
+      sell_price: Number(editForm.sell_price),
+      commission_percent: Number(editForm.commission_percent),
+      commission_amount: commissionAmount,
+      profit,
+      travelers: Number(editForm.travelers),
+      review_status: "pending",
+      reviewer_note: "",
+    }).eq("id", editDraft.id)
+    setResubmitting(false)
+    setEditDraft(null)
+    fetchDrafts()
   }
 
   if (!ready) return null
@@ -92,6 +139,13 @@ export default function DraftsPage() {
                 <td className="px-4 py-3">
                   <div className="flex gap-1">
                     <button onClick={() => { setSelected(d); setReviewNote("") }} className="p-1.5 rounded-xl" style={{ color: "var(--text-muted)" }}><Eye size={15} /></button>
+                    {d.review_status === "rejected" && d.submitted_by === profile?.fullName && (
+                      <button onClick={() => openEditDraft(d)}
+                        className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-xl transition-all hover:scale-105"
+                        style={{ background: "rgba(239,68,68,0.1)", color: "#ef4444" }}>
+                        <Edit3 size={12} />Düzəlt
+                      </button>
+                    )}
                     {profile?.role === "it_admin" && <button onClick={() => handleDelete(d.id)} className="p-1.5 rounded-xl" style={{ color: "var(--text-muted)" }}><XCircle size={15} /></button>}
                   </div>
                 </td>
@@ -127,8 +181,84 @@ export default function DraftsPage() {
               <div className="p-3 rounded-2xl" style={{ background: selected.review_status === "approved" ? "rgba(34,197,94,0.1)" : "rgba(239,68,68,0.1)" }}>
                 <p className="text-sm font-semibold" style={{ color: selected.review_status === "approved" ? "#22c55e" : "#ef4444" }}>{selected.review_status === "approved" ? "✅ Təsdiqlənib" : "❌ Rədd edilib"}</p>
                 {selected.reviewer_note && <p className="text-xs mt-1" style={{ color: "var(--text-secondary)" }}>{selected.reviewer_note}</p>}
+                {selected.review_status === "rejected" && selected.submitted_by === profile?.fullName && (
+                  <button onClick={() => openEditDraft(selected)}
+                    className="flex items-center gap-2 mt-3 w-full py-2.5 rounded-xl text-sm font-semibold text-white transition-all hover:scale-[1.02]"
+                    style={{ background: "linear-gradient(135deg,#6366f1,#8b5cf6)" }}>
+                    <Edit3 size={14} />Düzəlt və yenidən göndər
+                  </button>
+                )}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Edit & Resubmit Modal */}
+      {editDraft && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" style={{ backdropFilter: "blur(8px)" }}>
+          <div className="w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto" style={modalCard}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold" style={{ color: "var(--text-primary)" }}>Sifarişi düzəlt</h2>
+              <button onClick={() => setEditDraft(null)} style={{ color: "var(--text-muted)" }} className="text-xl">✕</button>
+            </div>
+
+            {editDraft.reviewer_note && (
+              <div className="p-3 rounded-2xl mb-4" style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)" }}>
+                <p className="text-xs font-semibold mb-1" style={{ color: "#ef4444" }}>Buxalterin qeydi:</p>
+                <p className="text-sm" style={{ color: "var(--text-primary)" }}>{editDraft.reviewer_note}</p>
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                { label: "Müştəri adı", key: "client_name", type: "text" },
+                { label: "Telefon", key: "client_phone", type: "text" },
+                { label: "İstiqamət", key: "destination", type: "text" },
+                { label: "Uçuş tarixi", key: "departure_date", type: "date" },
+                { label: "Qayıdış tarixi", key: "return_date", type: "date" },
+                { label: "Səyahətçi sayı", key: "travelers", type: "number" },
+                { label: "Alış qiyməti", key: "buy_price", type: "number" },
+                { label: "Satış qiyməti", key: "sell_price", type: "number" },
+                { label: "Komissiya %", key: "commission_percent", type: "number" },
+                { label: "Vendor", key: "vendor", type: "text" },
+                { label: "PNR", key: "pnr", type: "text" },
+                { label: "Bilet №", key: "ticket_number", type: "text" },
+              ].map(({ label, key, type }) => (
+                <div key={key}>
+                  <label className="text-xs font-medium mb-1 block" style={{ color: "var(--text-secondary)" }}>{label}</label>
+                  <input type={type} value={editForm[key]} onChange={e => setEditForm((f: any) => ({ ...f, [key]: e.target.value }))} style={inputStyle} />
+                </div>
+              ))}
+              <div className="col-span-2">
+                <label className="text-xs font-medium mb-1 block" style={{ color: "var(--text-secondary)" }}>Qeyd</label>
+                <textarea value={editForm.notes} onChange={e => setEditForm((f: any) => ({ ...f, notes: e.target.value }))}
+                  rows={2} style={{ ...inputStyle, resize: "none" }} />
+              </div>
+            </div>
+
+            {/* Profit preview */}
+            <div className="mt-3 p-3 rounded-2xl" style={{ background: "rgba(99,102,241,0.08)", border: "1px solid rgba(99,102,241,0.2)" }}>
+              <div className="flex justify-between text-xs">
+                <span style={{ color: "var(--text-secondary)" }}>Mənfəət:</span>
+                <span className="font-bold" style={{ color: "#22c55e" }}>
+                  {formatCurrency((Number(editForm.sell_price) - Number(editForm.buy_price)) * (1 - Number(editForm.commission_percent) / 100))}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-4">
+              <button onClick={handleResubmit} disabled={resubmitting}
+                className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-semibold text-white disabled:opacity-50"
+                style={{ background: "linear-gradient(135deg,#6366f1,#8b5cf6)" }}>
+                <Send size={15} />{resubmitting ? "Göndərilir..." : "Yenidən göndər"}
+              </button>
+              <button onClick={() => setEditDraft(null)}
+                className="px-5 py-3 rounded-2xl text-sm"
+                style={{ background: "var(--bg-glass)", border: "1px solid var(--border-color)", color: "var(--text-secondary)" }}>
+                Ləğv
+              </button>
+            </div>
           </div>
         </div>
       )}
