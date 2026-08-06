@@ -239,6 +239,7 @@ export default function DebtsPage() {
   const [typeFilter, setTypeFilter] = useState<string[]>([])
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
   const [activeTab, setActiveTab] = useState<"all" | "selected">("all")
+  const [viewMode, setViewMode] = useState<"list" | "clients">("list")
 
   const canDelete = ["it_admin", "direktor", "muhasib"].includes(profile?.role ?? "")
   const isReadOnly = profile?.role === "boss"
@@ -270,6 +271,17 @@ export default function DebtsPage() {
   const theyOwe = allDebts.reduce((s, b) => s + b.remaining, 0)
   const weOwe = manualDebts.filter(d => d.direction === "we_owe" && d.status === "pending").reduce((s, d) => s + d.amount, 0)
   const selectedTotal = selectedDebts.reduce((s, b) => s + b.remaining, 0)
+
+  const groupedClients = useMemo(() => {
+    const map: Record<string, { name: string; total: number; count: number; bookings: any[] }> = {}
+    allDebts.forEach(b => {
+      if (!map[b.clientName]) map[b.clientName] = { name: b.clientName, total: 0, count: 0, bookings: [] }
+      map[b.clientName].total += b.remaining
+      map[b.clientName].count++
+      map[b.clientName].bookings.push(b)
+    })
+    return Object.values(map).sort((a, b) => b.total - a.total)
+  }, [allDebts])
 
   function toggleRow(id: string) {
     setSelectedIds(prev => {
@@ -418,8 +430,82 @@ export default function DebtsPage() {
         </div>
       </div>
 
+      {/* View mode toggle */}
+      <div className="flex items-center gap-2 mb-4">
+        <div className="flex gap-1 p-1 rounded-2xl" style={{ background: "var(--bg-glass)", border: "1px solid var(--border-color)" }}>
+          <button onClick={() => setViewMode("list")}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all"
+            style={{ background: viewMode === "list" ? "linear-gradient(135deg,#6366f1,#8b5cf6)" : "transparent", color: viewMode === "list" ? "white" : "var(--text-secondary)" }}>
+            📋 Sifariş siyahısı
+          </button>
+          <button onClick={() => setViewMode("clients")}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all"
+            style={{ background: viewMode === "clients" ? "linear-gradient(135deg,#6366f1,#8b5cf6)" : "transparent", color: viewMode === "clients" ? "white" : "var(--text-secondary)" }}>
+            👤 Müştəri üzrə <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px]" style={{ background: viewMode === "clients" ? "rgba(255,255,255,0.2)" : "rgba(239,68,68,0.1)", color: viewMode === "clients" ? "white" : "#ef4444" }}>{groupedClients.length}</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Clients grouped view */}
+      {viewMode === "clients" && (
+        <div className="rounded-3xl overflow-hidden mb-5" style={card}>
+          <div className="px-5 py-4" style={{ borderBottom: "1px solid var(--border-color)" }}>
+            <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>Müştəri üzrə ümumi borc</h3>
+            <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>{groupedClients.length} müştəri · {formatCurrency(theyOwe)} cəmi</p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr style={{ background: "var(--bg-glass)", borderBottom: "1px solid var(--border-color)" }}>
+                  {["#", "Müştəri", "Sifariş sayı", "Ümumi borc", "Sifarişlər"].map(h => (
+                    <th key={h} className="text-left text-xs font-bold uppercase tracking-wider px-4 py-3" style={{ color: "var(--text-muted)" }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {groupedClients.map((c, i) => (
+                  <tr key={c.name} className="group transition-all" style={{ borderBottom: "1px solid var(--border-color)" }}
+                    onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "var(--bg-glass)"}
+                    onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = "transparent"}>
+                    <td className="px-4 py-3 text-sm font-bold" style={{ color: "var(--text-muted)" }}>{i + 1}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
+                          style={{ background: `hsl(${(i * 47) % 360}, 65%, 55%)` }}>
+                          {c.name.charAt(0).toUpperCase()}
+                        </div>
+                        <p className="font-semibold text-sm" style={{ color: "var(--text-primary)" }}>{c.name}</p>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="text-xs font-semibold px-2.5 py-1 rounded-xl" style={{ background: "rgba(99,102,241,0.1)", color: "#6366f1" }}>
+                        {c.count} sifariş
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="font-black tabular-nums text-base px-2.5 py-1 rounded-xl" style={{ color: "#ef4444", background: "rgba(239,68,68,0.08)" }}>
+                        {formatCurrency(c.total)}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex flex-wrap gap-1">
+                        {c.bookings.map((b: any) => (
+                          <span key={b.id} className="text-[10px] px-2 py-0.5 rounded-lg" style={{ background: "var(--bg-glass)", border: "1px solid var(--border-color)", color: "var(--text-secondary)" }}>
+                            {b.destination} · {formatCurrency(b.remaining)}
+                          </span>
+                        ))}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       {/* Tab bar */}
-      {selectedIds.size > 0 && (
+      {viewMode === "list" && selectedIds.size > 0 && (
         <div className="flex items-center gap-1 mb-4 p-1 rounded-2xl" style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
           <button onClick={() => setActiveTab("all")}
             className="flex-shrink-0 px-4 py-2 rounded-xl text-sm font-medium transition-all"
@@ -443,7 +529,7 @@ export default function DebtsPage() {
       )}
 
       {/* Debt list */}
-      {visibleDebts.length === 0 ? (
+      {viewMode === "list" && (visibleDebts.length === 0 ? (
         <div className="text-center py-16 rounded-3xl" style={{ ...card, color: "var(--text-muted)" }}>
           <p className="text-sm font-medium">Borc tapılmadı</p>
         </div>
@@ -458,7 +544,7 @@ export default function DebtsPage() {
           canDelete={canDelete}
           isReadOnly={isReadOnly}
         />
-      )}
+      ))}
 
       {/* Pay Modal */}
       {payModal && (
