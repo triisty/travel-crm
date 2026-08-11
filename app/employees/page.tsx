@@ -107,6 +107,10 @@ export default function EmployeesPage() {
   const [ready, setReady] = useState(false)
   const [activeTab, setActiveTab] = useState<"salary" | "period" | "employees">("salary")
   const [periodMonths, setPeriodMonths] = useState(1)
+  const [customFrom, setCustomFrom] = useState("")
+  const [customTo, setCustomTo] = useState("")
+  const [useCustom, setUseCustom] = useState(false)
+  const [expandedEmp, setExpandedEmp] = useState<string | null>(null)
   const [markingId, setMarkingId] = useState<string | null>(null)
 
   useEffect(() => { fetchBookings(); fetchEmployees(); setReady(true) }, [])
@@ -167,7 +171,7 @@ export default function EmployeesPage() {
   // Period stats for an employee
   function getPeriodStats(emp: Employee, nMonths: number) {
     const months = monthsBack(nMonths)
-    let totalSalary = 0, totalBonus = 0, totalPaid = 0, totalBookings = 0, totalRevenue = 0
+    let totalSalary = 0, totalBonus = 0, totalPaid = 0, totalBookings = 0, totalRevenue = 0, totalProfit = 0
     for (const m of months) {
       const p = allPayments.find(p => p.employeeId === emp.id && p.month === m)
       totalSalary += p?.salaryAmount ?? emp.baseSalary
@@ -177,8 +181,47 @@ export default function EmployeesPage() {
       const mb = getMonthBookings(emp.name, m)
       totalBookings += mb.length
       totalRevenue += mb.reduce((s, b) => s + b.sellPrice, 0)
+      totalProfit += mb.reduce((s, b) => s + b.profit + b.commissionAmount, 0)
     }
-    return { totalSalary, totalBonus, totalPaid, totalBookings, totalRevenue, months }
+    return { totalSalary, totalBonus, totalPaid, totalBookings, totalRevenue, totalProfit, months }
+  }
+
+  function getCustomStats(emp: Employee) {
+    if (!customFrom && !customTo) return null
+    const from = customFrom ? new Date(customFrom + "T00:00:00") : null
+    const to   = customTo   ? new Date(customTo   + "T23:59:59") : null
+
+    const filteredBookings = bookings.filter(b => {
+      if (b.manager !== emp.name) return false
+      const d = new Date(b.createdAt)
+      if (from && d < from) return false
+      if (to   && d > to)   return false
+      return true
+    })
+
+    const totalRevenue = filteredBookings.reduce((s, b) => s + b.sellPrice, 0)
+    const totalBuy     = filteredBookings.reduce((s, b) => s + b.buyPrice, 0)
+    const grossProfit  = filteredBookings.reduce((s, b) => s + b.profit + b.commissionAmount, 0)
+    const totalBonus   = Math.round(grossProfit * (emp.commissionPercent / 100) * 100) / 100
+    const totalProfit  = grossProfit - totalBonus
+
+    // Get months in range for salary
+    const months: string[] = []
+    if (customFrom && customTo) {
+      let cur = customFrom.slice(0, 7)
+      const end = customTo.slice(0, 7)
+      while (cur <= end) {
+        months.push(cur)
+        cur = nextMonth(cur)
+      }
+    }
+    const totalSalary = months.length * emp.baseSalary
+    const totalPaid = months.reduce((s, m) => {
+      const p = allPayments.find(p => p.employeeId === emp.id && p.month === m)
+      return s + (p?.salaryPaidAmount ?? 0) + (p?.bonusPaidAmount ?? 0)
+    }, 0)
+
+    return { filteredBookings, totalRevenue, totalBuy, grossProfit, totalBonus, totalProfit, totalSalary, totalPaid, months, bookingsCount: filteredBookings.length }
   }
 
   async function handleSavePayment(e: React.FormEvent<HTMLFormElement>) {
@@ -411,79 +454,159 @@ export default function EmployeesPage() {
       {/* ── Period Tab ── */}
       {activeTab === "period" && (
         <>
-          <div className="flex gap-2 mb-5">
-            {[1, 2, 3, 6].map(n => (
-              <button key={n} onClick={() => setPeriodMonths(n)}
-                className="px-4 py-2 rounded-xl text-sm font-semibold transition-all"
-                style={{
-                  background: periodMonths === n ? "linear-gradient(135deg,#6366f1,#8b5cf6)" : "var(--bg-glass)",
-                  color: periodMonths === n ? "white" : "var(--text-secondary)",
-                  border: "1px solid " + (periodMonths === n ? "transparent" : "var(--border-color)")
-                }}>
-                {n} ay
-              </button>
-            ))}
+          {/* Period selector */}
+          <div className="p-4 rounded-3xl mb-5" style={card}>
+            <div className="flex flex-wrap items-center gap-3">
+              {/* Quick buttons */}
+              <div className="flex gap-1.5">
+                {[1, 2, 3, 6].map(n => (
+                  <button key={n} onClick={() => { setPeriodMonths(n); setUseCustom(false) }}
+                    className="px-3 py-2 rounded-xl text-xs font-semibold transition-all"
+                    style={{
+                      background: !useCustom && periodMonths === n ? "linear-gradient(135deg,#6366f1,#8b5cf6)" : "var(--bg-glass)",
+                      color: !useCustom && periodMonths === n ? "white" : "var(--text-secondary)",
+                      border: "1px solid " + (!useCustom && periodMonths === n ? "transparent" : "var(--border-color)")
+                    }}>
+                    {n} ay
+                  </button>
+                ))}
+              </div>
+
+              <div className="w-px h-6" style={{ background: "var(--border-color)" }} />
+
+              {/* Custom date range */}
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium" style={{ color: "var(--text-muted)" }}>Özəl dövr:</span>
+                <input type="date" value={customFrom} onChange={e => { setCustomFrom(e.target.value); setUseCustom(true) }}
+                  className="text-xs outline-none px-2.5 py-2 rounded-xl"
+                  style={{ background: "var(--bg-glass)", border: "1px solid " + (useCustom ? "#6366f1" : "var(--border-color)"), color: "var(--text-primary)" }} />
+                <span className="text-xs" style={{ color: "var(--text-muted)" }}>—</span>
+                <input type="date" value={customTo} onChange={e => { setCustomTo(e.target.value); setUseCustom(true) }}
+                  className="text-xs outline-none px-2.5 py-2 rounded-xl"
+                  style={{ background: "var(--bg-glass)", border: "1px solid " + (useCustom ? "#6366f1" : "var(--border-color)"), color: "var(--text-primary)" }} />
+                {useCustom && (
+                  <button onClick={() => { setCustomFrom(""); setCustomTo(""); setUseCustom(false) }}
+                    className="p-1.5 rounded-lg transition-all hover:scale-110"
+                    style={{ color: "var(--text-muted)" }}>
+                    <X size={13} />
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
 
+          {/* Employee cards */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {activeEmps.map((emp, idx) => {
-              const stats = getPeriodStats(emp, periodMonths)
-              const unpaid = stats.totalSalary + stats.totalBonus - stats.totalPaid
+              const customStats = useCustom ? getCustomStats(emp) : null
+              const stats = useCustom ? null : getPeriodStats(emp, periodMonths)
+              const totalSalary = customStats?.totalSalary ?? stats?.totalSalary ?? 0
+              const totalBonus  = customStats?.totalBonus  ?? stats?.totalBonus  ?? 0
+              const totalPaid   = customStats?.totalPaid   ?? stats?.totalPaid   ?? 0
+              const totalBooks  = customStats?.bookingsCount ?? stats?.totalBookings ?? 0
+              const totalRev    = customStats?.totalRevenue ?? stats?.totalRevenue ?? 0
+              const totalProfit = customStats?.totalProfit ?? stats?.totalProfit ?? 0
+              const unpaid      = Math.max(0, totalSalary + totalBonus - totalPaid)
+              const isExpanded  = expandedEmp === emp.id
+
               return (
-                <div key={emp.id} className="p-5 rounded-3xl" style={card}>
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="w-10 h-10 rounded-2xl flex items-center justify-center text-base font-bold text-white flex-shrink-0"
-                      style={{ background: GRADIENTS[idx % GRADIENTS.length] }}>
-                      {emp.name.charAt(0)}
-                    </div>
-                    <div className="flex-1">
-                      <p className="font-bold text-sm" style={{ color: "var(--text-primary)" }}>{emp.name}</p>
-                      <p className="text-xs" style={{ color: "var(--text-muted)" }}>{emp.position} · {emp.commissionPercent}% komissiya</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-xs font-medium" style={{ color: "var(--text-muted)" }}>Son {periodMonths} ay</p>
-                      <p className="text-sm font-bold" style={{ color: "#6366f1" }}>{stats.totalBookings} sifariş</p>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3 mb-3">
-                    {[
-                      { label: "Maaş cəmi", value: formatCurrency(stats.totalSalary), color: "var(--text-primary)" },
-                      { label: "Bonus cəmi", value: formatCurrency(stats.totalBonus), color: "#f59e0b" },
-                      { label: "Ödənilib", value: formatCurrency(stats.totalPaid), color: "#22c55e" },
-                      { label: "Qalıq borc", value: formatCurrency(Math.max(0, unpaid)), color: unpaid > 0 ? "#ef4444" : "#22c55e" },
-                    ].map(({ label, value, color }) => (
-                      <div key={label} className="p-3 rounded-2xl" style={{ background: "var(--bg-glass)" }}>
-                        <p className="text-[10px] font-medium mb-0.5" style={{ color: "var(--text-muted)" }}>{label}</p>
-                        <p className="text-sm font-bold tabular-nums" style={{ color }}>{value}</p>
+                <div key={emp.id} className="rounded-3xl overflow-hidden" style={card}>
+                  {/* Header */}
+                  <div className="p-5">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-10 h-10 rounded-2xl flex items-center justify-center text-base font-bold text-white flex-shrink-0"
+                        style={{ background: GRADIENTS[idx % GRADIENTS.length] }}>
+                        {emp.name.charAt(0)}
                       </div>
-                    ))}
+                      <div className="flex-1">
+                        <p className="font-bold text-sm" style={{ color: "var(--text-primary)" }}>{emp.name}</p>
+                        <p className="text-xs" style={{ color: "var(--text-muted)" }}>{emp.position} · {emp.commissionPercent}% komissiya</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xs font-medium" style={{ color: "var(--text-muted)" }}>
+                          {useCustom ? (customFrom && customTo ? `${customFrom} — ${customTo}` : "Özəl dövr") : `Son ${periodMonths} ay`}
+                        </p>
+                        <p className="text-sm font-bold" style={{ color: "#6366f1" }}>{totalBooks} sifariş</p>
+                      </div>
+                    </div>
+
+                    {/* KPI grid */}
+                    <div className="grid grid-cols-3 gap-2 mb-3">
+                      {[
+                        { label: "Satış həcmi", value: formatCurrency(totalRev), color: "var(--text-primary)" },
+                        { label: "Brüt mənfəət", value: formatCurrency(totalProfit + totalBonus), color: "#6366f1" },
+                        { label: "Bonus (%"+emp.commissionPercent+")", value: formatCurrency(totalBonus), color: "#f59e0b" },
+                        { label: "Maaş cəmi", value: formatCurrency(totalSalary), color: "var(--text-primary)" },
+                        { label: "Ödənilib", value: formatCurrency(totalPaid), color: "#22c55e" },
+                        { label: "Borc", value: formatCurrency(unpaid), color: unpaid > 0 ? "#ef4444" : "#22c55e" },
+                      ].map(({ label, value, color }) => (
+                        <div key={label} className="p-2.5 rounded-2xl" style={{ background: "var(--bg-glass)" }}>
+                          <p className="text-[10px] font-medium mb-0.5" style={{ color: "var(--text-muted)" }}>{label}</p>
+                          <p className="text-xs font-bold tabular-nums" style={{ color }}>{value}</p>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Expand button */}
+                    <button onClick={() => setExpandedEmp(isExpanded ? null : emp.id)}
+                      className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-medium transition-all"
+                      style={{ background: "var(--bg-glass)", color: "var(--text-secondary)", border: "1px solid var(--border-color)" }}>
+                      {isExpanded ? "Gizlət ▲" : "Ətraflı göstər ▼"}
+                    </button>
                   </div>
 
-                  {/* Monthly breakdown */}
-                  <div className="space-y-1.5">
-                    {stats.months.map(m => {
-                      const p = allPayments.find(p => p.employeeId === emp.id && p.month === m)
-                      const bonus = calcRealCommission(emp, m)
-                      const mb = getMonthBookings(emp.name, m)
-                      const salPaid = p?.salaryPaidAmount ?? 0
-                      const bonPaid = p?.bonusPaidAmount ?? 0
-                      return (
-                        <div key={m} className="flex items-center justify-between px-3 py-2 rounded-xl"
-                          style={{ background: "var(--bg-glass)", border: "1px solid var(--border-color)" }}>
-                          <div className="flex items-center gap-2">
-                            <Calendar size={12} style={{ color: "var(--text-muted)" }} />
-                            <span className="text-xs font-semibold" style={{ color: "var(--text-primary)" }}>{getMonthLabel(m)}</span>
-                            <span className="text-[10px] px-1.5 py-0.5 rounded-lg" style={{ background: "rgba(99,102,241,0.1)", color: "#6366f1" }}>{mb.length} sif.</span>
+                  {/* Expanded: monthly breakdown or bookings list */}
+                  {isExpanded && (
+                    <div className="px-5 pb-5 space-y-2" style={{ borderTop: "1px solid var(--border-color)" }}>
+                      <p className="text-xs font-bold pt-3 mb-2" style={{ color: "var(--text-muted)" }}>
+                        {useCustom ? "SİFARİŞLƏR" : "AYLIQ İCMAL"}
+                      </p>
+
+                      {useCustom ? (
+                        /* Custom: show bookings list */
+                        customStats?.filteredBookings.length === 0 ? (
+                          <p className="text-xs text-center py-4" style={{ color: "var(--text-muted)" }}>Bu dövrdə sifariş yoxdur</p>
+                        ) : customStats?.filteredBookings.map((b: any) => (
+                          <div key={b.id} className="flex items-center justify-between px-3 py-2.5 rounded-xl"
+                            style={{ background: "var(--bg-glass)", border: "1px solid var(--border-color)" }}>
+                            <div>
+                              <p className="text-xs font-semibold" style={{ color: "var(--text-primary)" }}>{b.clientName}</p>
+                              <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>{b.destination} · {b.createdAt?.slice(0,10)}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-xs font-bold" style={{ color: "#22c55e" }}>{formatCurrency(b.sellPrice)}</p>
+                              <p className="text-[10px]" style={{ color: "#f59e0b" }}>
+                                +{formatCurrency(Math.round((b.profit + b.commissionAmount) * emp.commissionPercent / 100 * 100) / 100)} bonus
+                              </p>
+                            </div>
                           </div>
-                          <div className="flex items-center gap-3 text-xs">
-                            <span style={{ color: "var(--text-muted)" }}>Maaş: <span className="font-semibold" style={{ color: salPaid >= (p?.salaryAmount ?? emp.baseSalary) ? "#22c55e" : "#ef4444" }}>{formatCurrency(salPaid)}</span></span>
-                            <span style={{ color: "var(--text-muted)" }}>Bonus: <span className="font-semibold" style={{ color: bonPaid >= bonus && bonus > 0 ? "#22c55e" : bonus > 0 ? "#f59e0b" : "var(--text-muted)" }}>{formatCurrency(bonPaid)}/{formatCurrency(bonus)}</span></span>
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
+                        ))
+                      ) : (
+                        /* Monthly: show month breakdown */
+                        stats?.months.map(m => {
+                          const p = allPayments.find(p => p.employeeId === emp.id && p.month === m)
+                          const bonus = calcRealCommission(emp, m)
+                          const mb = getMonthBookings(emp.name, m)
+                          const salPaid = p?.salaryPaidAmount ?? 0
+                          const bonPaid = p?.bonusPaidAmount ?? 0
+                          return (
+                            <div key={m} className="flex items-center justify-between px-3 py-2 rounded-xl"
+                              style={{ background: "var(--bg-glass)", border: "1px solid var(--border-color)" }}>
+                              <div className="flex items-center gap-2">
+                                <Calendar size={12} style={{ color: "var(--text-muted)" }} />
+                                <span className="text-xs font-semibold" style={{ color: "var(--text-primary)" }}>{getMonthLabel(m)}</span>
+                                <span className="text-[10px] px-1.5 py-0.5 rounded-lg" style={{ background: "rgba(99,102,241,0.1)", color: "#6366f1" }}>{mb.length} sif.</span>
+                              </div>
+                              <div className="flex items-center gap-3 text-xs">
+                                <span style={{ color: "var(--text-muted)" }}>Maaş: <span className="font-semibold" style={{ color: salPaid >= (p?.salaryAmount ?? emp.baseSalary) ? "#22c55e" : "#ef4444" }}>{formatCurrency(salPaid)}</span></span>
+                                <span style={{ color: "var(--text-muted)" }}>Bonus: <span className="font-semibold" style={{ color: bonPaid >= bonus && bonus > 0 ? "#22c55e" : bonus > 0 ? "#f59e0b" : "var(--text-muted)" }}>{formatCurrency(bonPaid)}/{formatCurrency(bonus)}</span></span>
+                              </div>
+                            </div>
+                          )
+                        })
+                      )}
+                    </div>
+                  )}
                 </div>
               )
             })}
