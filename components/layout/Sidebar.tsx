@@ -77,24 +77,13 @@ function useUnread(profileId?: string) {
 // ─── Logo icon (replaces cheap airplane emoji) ──────────────────────────────
 function LogoIcon({ size = 36 }: { size?: number }) {
   return (
-    <div className="relative flex items-center justify-center flex-shrink-0"
-      style={{ width: size, height: size }}>
-      {/* Outer ring */}
-      <div className="absolute inset-0 rounded-2xl"
-        style={{ background:"linear-gradient(135deg,#ef4444,#f97316)", padding:1.5 }}>
-        <div className="w-full h-full rounded-[14px]" style={{ background:"#0f0f1a" }} />
-      </div>
-      {/* Inner glow */}
-      <div className="absolute inset-0 rounded-2xl opacity-40"
-        style={{ background:"linear-gradient(135deg,rgba(239,68,68,0.5),transparent)", filter:"blur(4px)" }} />
-      {/* IT letters */}
-      <span className="relative text-xs font-black tracking-tight" style={{
-        background:"linear-gradient(135deg,#ef4444,#f97316)",
-        WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent",
-        fontSize: size > 32 ? 13 : 11,
-        letterSpacing: "-0.5px",
-      }}>IT</span>
-    </div>
+    <span className="font-black flex-shrink-0" style={{
+      background: "linear-gradient(135deg,#ef4444,#f97316)",
+      WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+      fontSize: size > 32 ? 16 : 13,
+      letterSpacing: "-0.5px",
+      lineHeight: 1,
+    }}>IT</span>
   )
 }
 
@@ -407,9 +396,7 @@ export default function Sidebar() {
               </div>
             </div>
           ) : (
-            <div style={{ animation:"logoGlow 3s ease-in-out infinite" }}>
-              <LogoIcon size={36} />
-            </div>
+            <LogoIcon size={36} />
           )}
           <button onClick={() => setExpanded(v => !v)}
             className="w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0 transition-all hover:scale-110 active:scale-95"

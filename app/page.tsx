@@ -151,73 +151,48 @@ function DebtRow({ b, i }: { b: any; i: number }) {
 
 // ─── Flight Alert ─────────────────────────────────────────────────────────────
 function FlightAlertOverlay({ flights, onClose }: { flights: any[]; onClose: () => void }) {
-  const [visible, setVisible] = useState(true)
   useEffect(() => {
-    try {
-      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)()
-      const notes = [523, 659, 784, 1047, 784, 659, 523]
-      notes.forEach((freq, i) => {
-        const osc = ctx.createOscillator(); const gain = ctx.createGain()
-        osc.connect(gain); gain.connect(ctx.destination)
-        osc.frequency.value = freq; osc.type = "sine"
-        gain.gain.setValueAtTime(0.3, ctx.currentTime + i * 0.12)
-        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.12 + 0.2)
-        osc.start(ctx.currentTime + i * 0.12); osc.stop(ctx.currentTime + i * 0.12 + 0.25)
-      })
-    } catch {}
-    const t = setTimeout(() => { setVisible(false); setTimeout(onClose, 400) }, 8000)
+    const t = setTimeout(onClose, 6000)
     return () => clearTimeout(t)
   }, [])
-  if (!visible) return null
   const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1)
   const dateStr = tomorrow.toLocaleDateString("az-AZ", { day: "numeric", month: "long" })
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center"
-      style={{ background: "rgba(0,0,0,0.88)", backdropFilter: "blur(16px)", animation: "fadeIn 0.3s ease" }}>
-      <style>{`
-        @keyframes fadeIn{from{opacity:0}to{opacity:1}}
-        @keyframes planeFly{0%{transform:translateX(-120px) translateY(20px) rotate(-5deg);opacity:0}20%{opacity:1}100%{transform:translateX(calc(100vw + 120px)) translateY(-30px) rotate(6deg);opacity:0}}
-        @keyframes pulse-ring{0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,0.5)}50%{box-shadow:0 0 0 24px rgba(239,68,68,0)}}
-        @keyframes slideUp{from{transform:translateY(40px);opacity:0}to{transform:translateY(0);opacity:1}}
-        @keyframes countDown{from{width:100%}to{width:0%}}
-      `}</style>
-      <div style={{ position:"absolute", top:"15%", animation:"planeFly 2.8s ease-in-out infinite", fontSize:64, pointerEvents:"none" }}>✈️</div>
-      <div style={{ animation:"slideUp 0.4s cubic-bezier(0.34,1.56,0.64,1)", maxWidth:480, width:"90%", position:"relative" }}>
-        <div className="rounded-3xl overflow-hidden"
-          style={{ background:"linear-gradient(135deg,#1a0000,#2d0000)", border:"2px solid rgba(239,68,68,0.5)", animation:"pulse-ring 2s ease infinite" }}>
-          <div className="p-7 text-center" style={{ background:"linear-gradient(135deg,rgba(239,68,68,0.25),rgba(249,115,22,0.15))" }}>
-            <div style={{ fontSize:72, lineHeight:1, marginBottom:10 }}>🚨</div>
-            <h1 style={{ color:"white", fontSize:26, fontWeight:900, letterSpacing:"-0.5px", textShadow:"0 0 24px rgba(239,68,68,0.9)" }}>TƏCİLİ XATIRLATMA!</h1>
-            <p style={{ color:"rgba(255,255,255,0.7)", fontSize:14, marginTop:6 }}>Sabah — {dateStr} — {flights.length} müştərinin uçuşu var</p>
-          </div>
-          <div className="p-5 space-y-3">
-            {flights.slice(0,4).map((b: any, i: number) => (
-              <div key={b.id} className="flex items-center gap-3 p-3 rounded-2xl"
-                style={{ background:"rgba(255,255,255,0.07)", border:"1px solid rgba(255,255,255,0.1)", animation:`slideUp ${0.4+i*0.1}s cubic-bezier(0.34,1.56,0.64,1)` }}>
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center text-lg" style={{ background:"rgba(239,68,68,0.2)" }}>✈</div>
-                <div className="flex-1 min-w-0">
-                  <p style={{ color:"white", fontWeight:700, fontSize:14 }}>{b.clientName}</p>
-                  <p style={{ color:"rgba(255,255,255,0.5)", fontSize:12 }}>{b.destination} · {b.manager?.split(" ")[0]}</p>
-                </div>
-                <p style={{ color:b.paymentStatus==="paid"?"#4ade80":"#fbbf24", fontSize:11, fontWeight:600 }}>
-                  {b.paymentStatus==="paid"?"✓ Ödənilib":"⚠ Ödənilməyib"}
-                </p>
+      style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(8px)" }}>
+      <div className="w-full max-w-sm mx-4 rounded-3xl overflow-hidden"
+        style={{ background: "var(--bg-secondary)", border: "1px solid var(--border-color)" }}>
+        <div className="px-5 py-4" style={{ borderBottom: "1px solid var(--border-color)" }}>
+          <p className="text-xs font-bold uppercase tracking-widest mb-1" style={{ color: "var(--text-muted)" }}>Xatırlatma</p>
+          <p className="text-base font-bold" style={{ color: "var(--text-primary)" }}>
+            Sabah — {dateStr} — {flights.length} uçuş
+          </p>
+        </div>
+        <div className="p-4 space-y-2">
+          {flights.slice(0, 4).map((b: any) => (
+            <div key={b.id} className="flex items-center justify-between px-3 py-2.5 rounded-2xl"
+              style={{ background: "var(--bg-glass)", border: "1px solid var(--border-color)" }}>
+              <div>
+                <p className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>{b.clientName}</p>
+                <p className="text-xs" style={{ color: "var(--text-muted)" }}>{b.destination} · {b.manager?.split(" ")[0]}</p>
               </div>
-            ))}
-            {flights.length > 4 && <p style={{ color:"rgba(255,255,255,0.4)", fontSize:13, textAlign:"center" }}>+{flights.length-4} daha</p>}
-          </div>
-          <div className="px-5 pb-5">
-            <div style={{ height:3, background:"rgba(255,255,255,0.1)", borderRadius:9999, overflow:"hidden", marginBottom:12 }}>
-              <div style={{ height:"100%", background:"linear-gradient(90deg,#ef4444,#f97316)", borderRadius:9999, animation:"countDown 8s linear forwards" }} />
+              <span className="text-xs font-medium px-2 py-0.5 rounded-lg"
+                style={{ background: b.paymentStatus === "paid" ? "rgba(34,197,94,0.1)" : "rgba(245,158,11,0.1)", color: b.paymentStatus === "paid" ? "#22c55e" : "#f59e0b" }}>
+                {b.paymentStatus === "paid" ? "Ödənilib" : "Ödənilməyib"}
+              </span>
             </div>
-            <div className="flex gap-2">
-              <a href="/bookings" className="flex-1 py-3 rounded-2xl text-sm font-bold text-white text-center transition-all hover:scale-[1.02]"
-                style={{ background:"linear-gradient(135deg,#ef4444,#f97316)", boxShadow:"0 4px 20px rgba(239,68,68,0.5)" }}>Sifarişlərə bax →</a>
-              <button onClick={() => { setVisible(false); setTimeout(onClose,300) }}
-                className="px-4 py-3 rounded-2xl text-sm font-medium"
-                style={{ background:"rgba(255,255,255,0.1)", color:"rgba(255,255,255,0.6)", border:"1px solid rgba(255,255,255,0.1)" }}>Bağla</button>
-            </div>
-          </div>
+          ))}
+          {flights.length > 4 && <p className="text-xs text-center" style={{ color: "var(--text-muted)" }}>+{flights.length - 4} daha</p>}
+        </div>
+        <div className="px-4 pb-4 flex gap-2">
+          <a href="/bookings" className="flex-1 py-2.5 rounded-2xl text-sm font-semibold text-center transition-all"
+            style={{ background: "var(--bg-glass)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>
+            Sifarişlərə bax
+          </a>
+          <button onClick={onClose} className="px-4 py-2.5 rounded-2xl text-sm"
+            style={{ background: "var(--bg-glass)", border: "1px solid var(--border-color)", color: "var(--text-muted)" }}>
+            Bağla
+          </button>
         </div>
       </div>
     </div>
@@ -238,30 +213,50 @@ function FlightWidget({ bookings, profile }: { bookings: any[]; profile: any }) 
   useEffect(() => {
     if (flightsTomorrow.length > 0) {
       const key = `alert_${tomorrowStr}`
-      if (!sessionStorage.getItem(key)) { setTimeout(() => setShowAlert(true), 1500); sessionStorage.setItem(key, "1") }
+      if (!sessionStorage.getItem(key)) { setTimeout(() => setShowAlert(true), 1000); sessionStorage.setItem(key, "1") }
     }
   }, [flightsTomorrow.length])
   if (!flightsTomorrow.length && !flightsIn5Days.length && !flightsToday.length) return null
   return (
     <>
       {showAlert && <FlightAlertOverlay flights={flightsTomorrow} onClose={() => setShowAlert(false)} />}
-      <div className="mb-5 rounded-3xl overflow-hidden dash-card" style={{ border:"2px solid rgba(239,68,68,0.25)", background:"var(--bg-card)" }}>
-        <div className="px-5 py-4 flex items-center justify-between" style={{ background:"linear-gradient(135deg,rgba(239,68,68,0.1),rgba(249,115,22,0.06))", borderBottom:"1px solid rgba(239,68,68,0.15)" }}>
-          <div className="flex items-center gap-3">
-            <span style={{ fontSize:22, animation:"float 3s ease-in-out infinite" }}>✈️</span>
-            <div><p className="text-sm font-bold" style={{ color:"var(--text-primary)" }}>Uçuş Xatırlatmaları</p><p className="text-xs" style={{ color:"var(--text-muted)" }}>Yaxınlaşan uçuşlar</p></div>
-          </div>
+      <div className="mb-5 rounded-3xl overflow-hidden" style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+        <div className="px-5 py-3.5 flex items-center justify-between" style={{ borderBottom: "1px solid var(--border-color)" }}>
+          <p className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>Uçuş xatırlatmaları</p>
           {flightsTomorrow.length > 0 && (
-            <button onClick={() => setShowAlert(true)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-white transition-all hover:scale-105"
-              style={{ background:"linear-gradient(135deg,#ef4444,#f97316)", boxShadow:"0 4px 12px rgba(239,68,68,0.4)" }}>
-              🚨 {flightsTomorrow.length} sabah
+            <button onClick={() => setShowAlert(true)}
+              className="text-xs font-semibold px-3 py-1.5 rounded-xl transition-all"
+              style={{ background: "rgba(239,68,68,0.1)", color: "#ef4444", border: "1px solid rgba(239,68,68,0.2)" }}>
+              {flightsTomorrow.length} sabah
             </button>
           )}
         </div>
-        <div className="p-4 space-y-2">
-          {flightsToday.length > 0 && <div className="p-3 rounded-2xl flex items-center gap-3" style={{ background:"rgba(239,68,68,0.08)", border:"1px solid rgba(239,68,68,0.25)" }}><span className="text-lg">🔴</span><div className="flex-1"><p className="text-xs font-bold" style={{ color:"#ef4444" }}>BU GÜN — {flightsToday.length} müştəri</p><p className="text-xs" style={{ color:"var(--text-muted)" }}>{flightsToday.slice(0,3).map((b:any)=>b.clientName).join(" · ")}</p></div></div>}
-          {flightsTomorrow.length > 0 && <div className="p-3 rounded-2xl flex items-center gap-3" style={{ background:"rgba(249,115,22,0.08)", border:"1px solid rgba(249,115,22,0.25)" }}><span className="text-lg">🟠</span><div className="flex-1"><p className="text-xs font-bold" style={{ color:"#f97316" }}>SABAH — {flightsTomorrow.length} müştəri</p><p className="text-xs" style={{ color:"var(--text-muted)" }}>{flightsTomorrow.slice(0,3).map((b:any)=>b.clientName).join(" · ")}</p></div></div>}
-          {flightsIn5Days.length > 0 && <div className="p-3 rounded-2xl flex items-center gap-3" style={{ background:"rgba(245,158,11,0.08)", border:"1px solid rgba(245,158,11,0.25)" }}><span className="text-lg">🟡</span><div className="flex-1"><p className="text-xs font-bold" style={{ color:"#f59e0b" }}>5 GÜN SONRA — {flightsIn5Days.length} müştəri</p><p className="text-xs" style={{ color:"var(--text-muted)" }}>{flightsIn5Days.slice(0,3).map((b:any)=>b.clientName).join(" · ")}</p></div></div>}
+        <div className="p-4 flex flex-wrap gap-2">
+          {flightsToday.length > 0 && (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-2xl text-xs"
+              style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.15)", color: "#ef4444" }}>
+              <span className="font-bold">Bu gün</span>
+              <span className="font-semibold">{flightsToday.length} müştəri</span>
+              <span style={{ color: "rgba(239,68,68,0.6)" }}>·</span>
+              <span>{flightsToday.slice(0,2).map((b:any)=>b.clientName).join(", ")}{flightsToday.length > 2 ? ` +${flightsToday.length-2}` : ""}</span>
+            </div>
+          )}
+          {flightsTomorrow.length > 0 && (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-2xl text-xs"
+              style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.15)", color: "#f59e0b" }}>
+              <span className="font-bold">Sabah</span>
+              <span className="font-semibold">{flightsTomorrow.length} müştəri</span>
+              <span style={{ color: "rgba(245,158,11,0.6)" }}>·</span>
+              <span>{flightsTomorrow.slice(0,2).map((b:any)=>b.clientName).join(", ")}{flightsTomorrow.length > 2 ? ` +${flightsTomorrow.length-2}` : ""}</span>
+            </div>
+          )}
+          {flightsIn5Days.length > 0 && (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-2xl text-xs"
+              style={{ background: "var(--bg-glass)", border: "1px solid var(--border-color)", color: "var(--text-secondary)" }}>
+              <span className="font-bold">5 gün sonra</span>
+              <span className="font-semibold">{flightsIn5Days.length} müştəri</span>
+            </div>
+          )}
         </div>
       </div>
     </>
