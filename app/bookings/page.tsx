@@ -803,12 +803,12 @@ export default function SifarislerPage() {
 
         {/* Table */}
         <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[1300px]">
+          <table className="w-full text-sm">
             <thead>
               <tr style={{ background: "linear-gradient(135deg, var(--bg-glass), var(--bg-secondary))", borderBottom: "1px solid var(--border-color)" }}>
-                {["Növ", "Müştəri", "İstiqamət", "Vendor", "Tarix", "Menecer", "Satış", "Qalıq", "Mənfəət", "Status", "Ödəniş", ""].map(h => (
-                  <th key={h} className="text-left text-[11px] font-bold uppercase tracking-widest px-4 py-4"
-                    style={{ color: "var(--text-muted)", letterSpacing: "0.06em" }}>{h}</th>
+                {["Növ", "Müştəri", "İstiqamət", "Tarix", "Menecer", "Satış", "Qalıq", "Mənfəət", "Status", "Ödəniş", ""].map(h => (
+                  <th key={h} className="text-left text-[10px] font-bold uppercase tracking-wider px-3 py-3"
+                    style={{ color: "var(--text-muted)" }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -883,75 +883,64 @@ export default function SifarislerPage() {
                   <tr key={b.id} className="group transition-all" style={{ borderBottom: "1px solid var(--border-color)" }}
                     onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "var(--bg-glass)"}
                     onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = "transparent"}>
-                    <td className="px-4 py-3.5">
-                      <div className="flex flex-col gap-1.5">
-                        <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-xl w-fit" style={{ background: ti.bg, color: ti.color }}>
-                          <Icon size={11} />{ti.label}
+                    <td className="px-3 py-2.5">
+                      <div className="flex flex-col gap-1">
+                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-lg w-fit" style={{ background: ti.bg, color: ti.color }}>
+                          <Icon size={10} />{ti.label}
                         </span>
-                        {b.isIata && <span className="text-[10px] font-bold px-2 py-0.5 rounded-lg w-fit text-white" style={{ background: "linear-gradient(135deg,#3b82f6,#06b6d4)" }}>IATA</span>}
+                        {b.isIata && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded w-fit text-white" style={{ background: "#3b82f6" }}>IATA</span>}
                       </div>
                     </td>
-                    <td className="px-4 py-3.5">
-                      <p className="font-semibold text-sm" style={{ color: "var(--text-primary)" }}>{b.clientName}</p>
-                      {b.clientPhone && <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>{b.clientPhone}</p>}
+                    <td className="px-3 py-2.5" style={{ maxWidth: 140 }}>
+                      <p className="font-semibold text-xs truncate" style={{ color: "var(--text-primary)" }}>{b.clientName}</p>
+                      {b.clientPhone && <p className="text-[10px] truncate" style={{ color: "var(--text-muted)" }}>{b.clientPhone}</p>}
                     </td>
-                    <td className="px-4 py-3.5">
-                      <p className="font-medium text-sm" style={{ color: "var(--text-primary)" }}>{b.destination}</p>
-                      <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>{b.travelers} nəfər</p>
+                    <td className="px-3 py-2.5" style={{ maxWidth: 150 }}>
+                      <p className="text-xs font-medium truncate" style={{ color: "var(--text-primary)" }}>{b.destination}</p>
+                      {b.vendor && <p className="text-[10px] truncate" style={{ color: "var(--text-muted)" }}>{b.vendor}</p>}
                     </td>
-                    <td className="px-4 py-3.5">
-                      {b.vendor
-                        ? <span className="text-xs font-medium px-2.5 py-1 rounded-xl" style={{ background: "var(--bg-glass)", color: "var(--text-secondary)", border: "1px solid var(--border-color)" }}>{b.vendor}</span>
+                    <td className="px-3 py-2.5 whitespace-nowrap">
+                      <p className="text-xs font-medium" style={{ color: "var(--text-primary)" }}>{formatDate(b.departureDate)}</p>
+                    </td>
+                    <td className="px-3 py-2.5">
+                      <p className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>{b.manager?.split(" ")[0]}</p>
+                    </td>
+                    <td className="px-3 py-2.5 text-right">
+                      <p className="font-bold tabular-nums text-xs" style={{ color: "var(--text-primary)" }}>{formatCurrency(b.sellPrice)}</p>
+                      <p className="text-[10px] tabular-nums" style={{ color: "#22c55e" }}>{formatCurrency(b.paidAmount ?? 0)}</p>
+                    </td>
+                    <td className="px-3 py-2.5 text-right">
+                      {remaining > 0
+                        ? <span className="font-bold tabular-nums text-xs px-1.5 py-0.5 rounded" style={{ color: "#ef4444", background: "rgba(239,68,68,0.08)" }}>{formatCurrency(remaining)}</span>
                         : <span style={{ color: "var(--text-muted)" }}>—</span>}
                     </td>
-                    <td className="px-4 py-3.5 whitespace-nowrap">
-                      <p className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>{formatDate(b.departureDate)}</p>
-                      <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>→ {formatDate(b.returnDate)}</p>
-                    </td>
-                    <td className="px-4 py-3.5">
-                      <div className="flex items-center gap-1.5">
-                        <div className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0" style={{ background: "rgba(99,102,241,0.12)", color: "#6366f1" }}>
-                          {b.manager?.charAt(0)}
-                        </div>
-                        <p className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>{b.manager?.split(" ")[0]}</p>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3.5 text-right">
-                      <p className="font-bold tabular-nums text-sm" style={{ color: "var(--text-primary)" }}>{formatCurrency(b.sellPrice)}</p>
-                      <p className="text-xs mt-0.5 tabular-nums" style={{ color: "#22c55e" }}>{formatCurrency(b.paidAmount ?? 0)}</p>
-                    </td>
-                    <td className="px-4 py-3.5 text-right">
-                      {remaining > 0
-                        ? <span className="font-bold tabular-nums text-sm px-2 py-0.5 rounded-lg" style={{ color: "#ef4444", background: "rgba(239,68,68,0.08)" }}>{formatCurrency(remaining)}</span>
-                        : <span className="text-base" style={{ color: "var(--text-muted)" }}>—</span>}
-                    </td>
-                    <td className="px-4 py-3.5 text-right">
-                      <span className={`font-bold tabular-nums text-sm px-2 py-0.5 rounded-lg ${b.profit >= 0 ? "text-green-500" : "text-red-500"}`}
+                    <td className="px-3 py-2.5 text-right">
+                      <span className={`font-bold tabular-nums text-xs px-1.5 py-0.5 rounded ${b.profit >= 0 ? "text-green-500" : "text-red-500"}`}
                         style={{ background: b.profit >= 0 ? "rgba(34,197,94,0.08)" : "rgba(239,68,68,0.08)" }}>
                         {b.profit >= 0 ? "+" : ""}{formatCurrency(b.profit)}
                       </span>
                     </td>
-                    <td className="px-4 py-3.5"><StatusBadge status={b.status} /></td>
-                    <td className="px-4 py-3.5"><PaymentBadge status={b.paymentStatus} /></td>
-                    <td className="px-4 py-3.5">
+                    <td className="px-3 py-2.5"><StatusBadge status={b.status} /></td>
+                    <td className="px-3 py-2.5"><PaymentBadge status={b.paymentStatus} /></td>
+                    <td className="px-3 py-2.5">
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
                         <button onClick={() => setViewModal(b)}
-                          className="p-1.5 rounded-xl transition-all hover:scale-110"
+                          className="p-1 rounded-lg transition-all hover:scale-110"
                           style={{ color: "#6366f1", background: "rgba(99,102,241,0.1)" }}>
-                          <Eye size={13} />
+                          <Eye size={12} />
                         </button>
                         {!isReadOnly && (
                           <button onClick={() => { setSelected(b); setModal("edit") }}
-                            className="p-1.5 rounded-xl transition-all hover:scale-110"
+                            className="p-1 rounded-lg transition-all hover:scale-110"
                             style={{ color: "var(--text-secondary)", background: "var(--bg-glass)" }}>
-                            <Edit3 size={13} />
+                            <Edit3 size={12} />
                           </button>
                         )}
                         {canDelete && (
                           <button onClick={() => { if (confirm("Silinsin?")) { deleteBooking(b.id); logActivity({ userName: profile?.fullName ?? "", userRole: profile?.role ?? "", action: "delete", entity: "booking", entityId: b.id, details: { client: b.clientName, destination: b.destination } }) } }}
-                            className="p-1.5 rounded-xl transition-all hover:scale-110"
+                            className="p-1 rounded-lg transition-all hover:scale-110"
                             style={{ color: "#ef4444", background: "rgba(239,68,68,0.1)" }}>
-                            <Trash2 size={13} />
+                            <Trash2 size={12} />
                           </button>
                         )}
                       </div>

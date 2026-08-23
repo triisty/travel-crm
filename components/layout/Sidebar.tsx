@@ -13,6 +13,7 @@ import Image from "next/image"
 import { supabase } from "@/lib/supabase"
 import { useUserRole } from "@/lib/hooks/useUserRole"
 import { ThemeToggle } from "@/components/ThemeProvider"
+import { useDemo } from "@/components/DemoContext"
 
 const ALL_MENU = [
   { href: "/",          label: "Dashboard",   icon: LayoutDashboard, roles: ["it_admin","boss","direktor","muhasib","menecer","bilet_menecer","tender_menecer"] },
@@ -328,6 +329,7 @@ export default function Sidebar() {
   const pathname = usePathname()
   const router = useRouter()
   const { profile } = useUserRole()
+  const { demo, toggleDemo } = useDemo()
   const [mounted, setMounted] = useState(false)
   const [expanded, setExpanded] = useState(false)
   const [financeOpen, setFinanceOpen] = useState(false)
@@ -514,9 +516,22 @@ export default function Sidebar() {
             )}
           </div>
 
-          {/* Theme + Logout */}
+          {/* Theme + Demo + Logout */}
           <div className="flex gap-1.5" style={{ flexDirection:expanded?"row":"column", alignItems:"center" }}>
             <ThemeToggle />
+            <button onClick={toggleDemo} title="Demo rejimi"
+              className="flex items-center justify-center rounded-2xl transition-all hover:scale-[1.03] active:scale-95"
+              style={{
+                padding:"8px", flex: expanded ? 1 : "none",
+                background: demo ? "rgba(99,102,241,0.15)" : "var(--bg-glass)",
+                border: "1px solid " + (demo ? "rgba(99,102,241,0.4)" : "var(--border-color)"),
+                color: demo ? "#6366f1" : "var(--text-secondary)",
+                gap: expanded ? 6 : 0,
+                width: expanded ? "auto" : 36, height: 36,
+              }}>
+              <span style={{ fontSize: 14 }}>🎬</span>
+              {expanded && <span className="text-xs font-semibold">{demo ? "Demo: ON" : "Demo"}</span>}
+            </button>
             <button onClick={handleLogout} title="Çıxış"
               className="flex items-center justify-center rounded-2xl transition-all hover:scale-[1.03] active:scale-95"
               style={{
