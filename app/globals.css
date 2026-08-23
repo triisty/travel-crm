@@ -195,25 +195,41 @@ tbody tr:hover {
   transition: transform 0.2s ease, box-shadow 0.2s ease !important;
 }
 /* ── Demo Mode ── */
+/* Blur all numbers */
 body.demo-mode .tabular-nums,
 body.demo-mode [class*="tabular-nums"] {
   filter: blur(5px);
   user-select: none;
-  transition: filter 0.2s ease;
 }
 
-body.demo-mode .demo-blur {
-  filter: blur(5px);
-  user-select: none;
-  transition: filter 0.2s ease;
-}
-
-/* Demo Mode — names and phones */
-body.demo-mode .demo-name {
-  filter: blur(4px);
-  user-select: none;
-}
+/* Blur client names and phones */
+body.demo-mode .demo-name,
 body.demo-mode .demo-phone {
   filter: blur(4px);
+  user-select: none;
+}
+
+/* Blur ALL table cell content in demo mode */
+body.demo-mode table td {
+  filter: blur(4px);
+  user-select: none;
+}
+
+/* But keep action buttons visible */
+body.demo-mode table td button,
+body.demo-mode table td a,
+body.demo-mode table td svg {
+  filter: none;
+  user-select: auto;
+}
+
+/* Blur KPI card numbers (large text in cards) */
+body.demo-mode .text-xl.font-black,
+body.demo-mode .text-2xl.font-black,
+body.demo-mode .text-3xl.font-black,
+body.demo-mode .text-5xl.font-black,
+body.demo-mode .text-2xl.font-bold,
+body.demo-mode .text-xl.font-bold {
+  filter: blur(5px);
   user-select: none;
 }
