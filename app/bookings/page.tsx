@@ -892,8 +892,8 @@ export default function SifarislerPage() {
                       </div>
                     </td>
                     <td className="px-3 py-2.5" style={{ maxWidth: 140 }}>
-                      <p className="font-semibold text-xs truncate" style={{ color: "var(--text-primary)" }}>{b.clientName}</p>
-                      {b.clientPhone && <p className="text-[10px] truncate" style={{ color: "var(--text-muted)" }}>{b.clientPhone}</p>}
+                      <p className="font-semibold text-xs truncate demo-name" style={{ color: "var(--text-primary)" }}>{b.clientName}</p>
+                      {b.clientPhone && <p className="text-[10px] truncate demo-phone" style={{ color: "var(--text-muted)" }}>{b.clientPhone}</p>}
                     </td>
                     <td className="px-3 py-2.5" style={{ maxWidth: 150 }}>
                       <p className="text-xs font-medium truncate" style={{ color: "var(--text-primary)" }}>{b.destination}</p>

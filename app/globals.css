@@ -207,3 +207,13 @@ body.demo-mode .demo-blur {
   user-select: none;
   transition: filter 0.2s ease;
 }
+
+/* Demo Mode — names and phones */
+body.demo-mode .demo-name {
+  filter: blur(4px);
+  user-select: none;
+}
+body.demo-mode .demo-phone {
+  filter: blur(4px);
+  user-select: none;
+}
