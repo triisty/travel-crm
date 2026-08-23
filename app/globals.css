@@ -194,3 +194,16 @@ tbody tr:hover {
 .rounded-3xl {
   transition: transform 0.2s ease, box-shadow 0.2s ease !important;
 }
+/* ── Demo Mode ── */
+body.demo-mode .tabular-nums,
+body.demo-mode [class*="tabular-nums"] {
+  filter: blur(5px);
+  user-select: none;
+  transition: filter 0.2s ease;
+}
+
+body.demo-mode .demo-blur {
+  filter: blur(5px);
+  user-select: none;
+  transition: filter 0.2s ease;
+}
