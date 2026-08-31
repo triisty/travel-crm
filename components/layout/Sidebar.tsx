@@ -1,42 +1,46 @@
 "use client"
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
+import Image from "next/image"
 import { usePathname, useRouter } from "next/navigation"
 import {
   LayoutDashboard, ClipboardList, Wallet, CreditCard, Globe,
   Settings, HelpCircle, LogOut, BotMessageSquare, Users,
   PlaneTakeoff, Building2, Scale, Clock, MessageCircle,
-  ChevronRight, FileText, User, Activity, Trophy,
-  BarChart3, ChevronLeft, Menu, X
+  ChevronRight, ChevronLeft, FileText, User, Activity, Trophy,
+  Menu, X, ChevronDown
 } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import { useUserRole } from "@/lib/hooks/useUserRole"
 import { ThemeToggle } from "@/components/ThemeProvider"
 import { useDemo } from "@/components/DemoContext"
 
-// ── Menu config ──────────────────────────────────────────────
-const ALL_MENU = [
-  { href: "/",          label: "Dashboard",    icon: LayoutDashboard, roles: ["it_admin","boss","direktor","muhasib","menecer","bilet_menecer","tender_menecer"] },
-  { href: "/bookings",  label: "Sifarişlər",   icon: ClipboardList,   roles: ["it_admin","boss","direktor","muhasib","menecer","bilet_menecer"] },
-  { href: "/drafts",    label: "Təsdiq",       icon: Clock,           roles: ["it_admin","direktor","muhasib","menecer"] },
-  { href: "/mesajlar",  label: "Mesajlar",     icon: MessageCircle,   roles: ["it_admin","boss","direktor","muhasib","menecer","bilet_menecer"] },
-  { href: "/tenders",   label: "Tenderlər",    icon: Trophy,          roles: ["it_admin","boss","direktor","tender_menecer","muhasib"] },
-  { href: "/employees", label: "İşçilər",      icon: Users,           roles: ["it_admin","boss","direktor","muhasib"] },
-  { href: "/assistant", label: "AI Köməkçi",   icon: BotMessageSquare,roles: ["it_admin","boss","direktor","muhasib","menecer"] },
-  { href: "/mir",       label: "MIR Import",   icon: FileText,        roles: ["it_admin","direktor","menecer","bilet_menecer"] },
-  { href: "/flights",   label: "TK NDC",       icon: PlaneTakeoff,    roles: ["it_admin","direktor","menecer"] },
-  { href: "/founder",   label: "Əsasçı",       icon: User,            roles: ["it_admin","direktor","boss","muhasib"] },
-  { href: "/logs",      label: "Jurnal",        icon: Activity,        roles: ["it_admin"] },
-  { href: "/settings",  label: "Ayarlar",      icon: Settings,        roles: ["it_admin","boss","direktor","muhasib","menecer","bilet_menecer","tender_menecer"] },
-  { href: "/help",      label: "Yardım",       icon: HelpCircle,      roles: ["it_admin","boss","direktor","muhasib","menecer","bilet_menecer","tender_menecer"] },
+// ── Menu config ───────────────────────────────────────────────
+const MAIN_MENU = [
+  { href: "/",          label: "Dashboard",   icon: LayoutDashboard, section: "menu", roles: ["it_admin","boss","direktor","muhasib","menecer","bilet_menecer","tender_menecer"] },
+  { href: "/bookings",  label: "Sifarişlər",  icon: ClipboardList,   section: "menu", roles: ["it_admin","boss","direktor","muhasib","menecer","bilet_menecer"] },
+  { href: "/drafts",    label: "Təsdiq",      icon: Clock,           section: "menu", roles: ["it_admin","direktor","muhasib","menecer"] },
+  { href: "/mesajlar",  label: "Mesajlar",    icon: MessageCircle,   section: "menu", roles: ["it_admin","boss","direktor","muhasib","menecer","bilet_menecer"] },
+  { href: "/tenders",   label: "Tenderlər",   icon: Trophy,          section: "menu", roles: ["it_admin","boss","direktor","tender_menecer","muhasib"] },
+  { href: "/employees", label: "İşçilər",     icon: Users,           section: "menu", roles: ["it_admin","boss","direktor","muhasib"] },
+  { href: "/assistant", label: "AI Köməkçi",  icon: BotMessageSquare,section: "menu", roles: ["it_admin","boss","direktor","muhasib","menecer"] },
+  { href: "/mir",       label: "MIR Import",  icon: FileText,        section: "menu", roles: ["it_admin","direktor","menecer","bilet_menecer"] },
+  { href: "/flights",   label: "TK NDC",      icon: PlaneTakeoff,    section: "menu", roles: ["it_admin","direktor","menecer"] },
 ]
 
 const FINANCE_MENU = [
-  { href: "/finances",  label: "Maliyyə",      icon: Wallet },
-  { href: "/debts",     label: "Borclar",      icon: CreditCard },
-  { href: "/creditors", label: "Kreditorlar",  icon: Building2 },
-  { href: "/balances",  label: "Balanslar",    icon: Scale },
-  { href: "/iata",      label: "IATA",         icon: Globe },
+  { href: "/finances",  label: "Maliyyə",     icon: Wallet },
+  { href: "/debts",     label: "Borclar",     icon: CreditCard },
+  { href: "/creditors", label: "Kreditorlar", icon: Building2 },
+  { href: "/balances",  label: "Balanslar",   icon: Scale },
+  { href: "/iata",      label: "IATA",        icon: Globe },
+]
+
+const TOOLS_MENU = [
+  { href: "/logs",      label: "Jurnal",      icon: Activity,  roles: ["it_admin"] },
+  { href: "/founder",   label: "Əsasçı",      icon: User,      roles: ["it_admin","direktor","boss","muhasib"] },
+  { href: "/settings",  label: "Ayarlar",     icon: Settings,  roles: ["it_admin","boss","direktor","muhasib","menecer","bilet_menecer","tender_menecer"] },
+  { href: "/help",      label: "Yardım",      icon: HelpCircle,roles: ["it_admin","boss","direktor","muhasib","menecer","bilet_menecer","tender_menecer"] },
 ]
 
 const FINANCE_ROLES = ["it_admin","boss","direktor","muhasib","bilet_menecer"]
@@ -46,100 +50,90 @@ const ROLE_LABELS: Record<string,string> = {
   muhasib: "Mühasib", menecer: "Menecer", bilet_menecer: "Bilet Menecer",
   tender_menecer: "Tender Menecer",
 }
-
-const ROLE_COLORS: Record<string,string> = {
-  it_admin:      "#6366f1",
-  boss:          "#dc2626",
-  direktor:      "#2563eb",
-  muhasib:       "#16a34a",
-  menecer:       "#d97706",
-  bilet_menecer: "#0891b2",
-  tender_menecer:"#7c3aed",
+const ROLE_COLOR: Record<string,string> = {
+  it_admin:"#e84545", boss:"#e84545", direktor:"#4a90d9",
+  muhasib:"#2bb5a0", menecer:"#f5a623", bilet_menecer:"#7c5cbf",
+  tender_menecer:"#2bb5a0",
 }
 
-// ── unread messages ─────────────────────────────────────────
-function useUnread(profileId?: string) {
-  const [count, setCount] = useState(0)
+function useUnread(id?: string) {
+  const [n, setN] = useState(0)
   useEffect(() => {
-    if (!profileId) return
+    if (!id) return
     const load = async () => {
-      const { data } = await supabase.from("messages").select("id").eq("receiver_id", profileId).eq("is_read", false)
-      setCount(data?.length ?? 0)
+      const { data } = await supabase.from("messages").select("id").eq("receiver_id", id).eq("is_read", false)
+      setN(data?.length ?? 0)
     }
     load()
-    const t = setInterval(load, 8000)
+    const t = setInterval(load, 10000)
     return () => clearInterval(t)
-  }, [profileId])
-  return count
+  }, [id])
+  return n
 }
 
-// ── NavItem ──────────────────────────────────────────────────
-function NavItem({ item, expanded, pathname, badge }: { item: any; expanded: boolean; pathname: string; badge?: number }) {
-  const isActive = pathname === item.href
-  const Icon = item.icon
+// ── NavItem ───────────────────────────────────────────────────
+function NavItem({ href, label, icon: Icon, active, badge, collapsed }: any) {
   return (
-    <Link href={item.href}
-      className={`nav-item group relative ${isActive ? "active" : ""}`}
-      style={{ justifyContent: expanded ? "flex-start" : "center", padding: expanded ? "7px 10px" : "8px" }}>
+    <Link href={href}
+      className={`nav-item ${active ? "active" : ""}`}
+      style={{ justifyContent: collapsed ? "center" : "flex-start", padding: collapsed ? "8px" : "6px 10px" }}>
       <div className="relative flex-shrink-0">
-        <Icon size={16} strokeWidth={isActive ? 2.2 : 1.8} />
-        {badge && badge > 0 && !expanded && (
-          <span className="absolute -top-1.5 -right-1.5 w-3.5 h-3.5 rounded-full text-white flex items-center justify-center"
-            style={{ background: "#dc2626", fontSize: "9px", fontWeight: 700 }}>
-            {badge > 9 ? "9+" : badge}
+        <Icon size={15} strokeWidth={active ? 2.2 : 1.8} />
+        {badge > 0 && collapsed && (
+          <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full text-white text-[8px] font-bold flex items-center justify-center"
+            style={{ background: "var(--accent)" }}>
+            {badge > 9 ? "9" : badge}
           </span>
         )}
       </div>
-      {expanded && (
+      {!collapsed && (
         <>
-          <span className="flex-1 text-xs truncate">{item.label}</span>
-          {badge && badge > 0 && (
+          <span className="flex-1 text-[13px] truncate">{label}</span>
+          {badge > 0 && (
             <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full text-white"
-              style={{ background: "#dc2626" }}>
+              style={{ background: "var(--accent)" }}>
               {badge > 9 ? "9+" : badge}
             </span>
           )}
         </>
       )}
-      {!expanded && (
-        <div className="tooltip">{item.label}</div>
+      {collapsed && (
+        <div className="absolute left-full ml-2.5 px-2.5 py-1 rounded-md text-[12px] font-medium text-white pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50"
+          style={{ background: "#1a2332", top: "50%", transform: "translateY(-50%)", boxShadow: "0 4px 12px rgba(0,0,0,0.2)" }}>
+          {label}
+          <div className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent" style={{ borderRightColor: "#1a2332" }} />
+        </div>
       )}
     </Link>
   )
 }
 
-// ── Mobile Nav ───────────────────────────────────────────────
+// ── Mobile nav ────────────────────────────────────────────────
 export function MobileNav() {
   const pathname = usePathname()
   const router = useRouter()
   const { profile } = useUserRole()
   const [open, setOpen] = useState(false)
   const unread = useUnread(profile?.id)
-  const MENU = ALL_MENU.filter(m => !profile || m.roles.includes(profile.role))
-  const finMenu = profile && FINANCE_ROLES.includes(profile.role)
-    ? (profile.role === "bilet_menecer" ? FINANCE_MENU.filter(f => f.href === "/iata") : FINANCE_MENU)
-    : []
+  const mainMenu = MAIN_MENU.filter(m => !profile || m.roles.includes(profile.role))
+  const toolsMenu = TOOLS_MENU.filter(m => !profile || m.roles.includes(profile.role))
+  const showFin = profile && FINANCE_ROLES.includes(profile.role)
+  const finMenu = profile?.role === "bilet_menecer" ? FINANCE_MENU.filter(f => f.href === "/iata") : FINANCE_MENU
 
-  async function handleLogout() {
-    await supabase.auth.signOut()
-    router.push("/login"); router.refresh()
-  }
+  async function logout() { await supabase.auth.signOut(); router.push("/login"); router.refresh() }
 
   return (
     <>
       {/* Top bar */}
-      <div className="md:hidden flex items-center justify-between px-4 h-12 sticky top-0 z-40"
-        style={{ background: "var(--bg-card)", borderBottom: "1px solid var(--border-color)" }}>
-        <div className="flex items-center gap-2">
-          <span className="font-black text-sm" style={{ color: "var(--accent)" }}>its</span>
-          <span className="font-black text-sm" style={{ color: "var(--text-primary)" }}>tour</span>
-        </div>
+      <div className="md:hidden sticky top-0 z-40 flex items-center justify-between px-4 h-12"
+        style={{ background: "var(--sidebar-bg)", borderBottom: "1px solid var(--sidebar-border)" }}>
+        <Image src="/logo.png" alt="ITS Tour" width={72} height={24} style={{ objectFit: "contain" }} />
         <div className="flex items-center gap-1">
           <ThemeToggle />
           <button onClick={() => setOpen(v => !v)}
             className="w-8 h-8 flex items-center justify-center rounded-lg"
             style={{ color: "var(--text-secondary)", background: "var(--bg-hover)" }}>
-            <Menu size={16} />
+            {open ? <X size={16} /> : <Menu size={16} />}
           </button>
         </div>
       </div>
@@ -147,90 +141,59 @@ export function MobileNav() {
       {/* Drawer */}
       {open && (
         <div className="md:hidden fixed inset-0 z-50" onClick={() => setOpen(false)}>
-          <div className="absolute inset-0" style={{ background: "rgba(0,0,0,0.4)", backdropFilter: "blur(4px)" }} />
-          <div className="absolute right-0 top-0 bottom-0 w-72 overflow-y-auto"
-            style={{ background: "var(--bg-card)", borderLeft: "1px solid var(--border-color)" }}
+          <div className="absolute inset-0" style={{ background: "rgba(0,0,0,0.4)" }} />
+          <div className="absolute right-0 top-0 h-full w-72 overflow-y-auto"
+            style={{ background: "var(--sidebar-bg)", borderLeft: "1px solid var(--sidebar-border)" }}
             onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between p-4" style={{ borderBottom: "1px solid var(--border-color)" }}>
-              <div className="flex items-center gap-2">
-                <span className="font-black text-base" style={{ color: "var(--accent)" }}>its</span>
-                <span className="font-black text-base" style={{ color: "var(--text-primary)" }}>tour</span>
-                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded" style={{ background: "var(--accent-light)", color: "var(--accent)" }}>CRM</span>
-              </div>
+            <div className="flex items-center justify-between p-4" style={{ borderBottom: "1px solid var(--sidebar-border)" }}>
+              <Image src="/logo.png" alt="ITS Tour" width={80} height={28} style={{ objectFit: "contain" }} />
               <button onClick={() => setOpen(false)} style={{ color: "var(--text-muted)" }}><X size={16} /></button>
             </div>
-
             <div className="p-3 space-y-0.5">
-              {MENU.map(item => {
-                const isActive = pathname === item.href
-                const Icon = item.icon
-                return (
-                  <Link key={item.href} href={item.href} onClick={() => setOpen(false)}
-                    className={`nav-item ${isActive ? "active" : ""}`}>
-                    <Icon size={16} strokeWidth={1.8} />
-                    <span className="text-xs">{item.label}</span>
-                  </Link>
-                )
-              })}
-
-              {finMenu.length > 0 && (
-                <>
-                  <div className="pt-3 pb-1">
-                    <span className="section-label">Maliyyə</span>
-                  </div>
-                  {finMenu.map(item => {
-                    const isActive = pathname === item.href
-                    const Icon = item.icon
-                    return (
-                      <Link key={item.href} href={item.href} onClick={() => setOpen(false)}
-                        className={`nav-item ${isActive ? "active" : ""}`}>
-                        <Icon size={16} strokeWidth={1.8} />
-                        <span className="text-xs">{item.label}</span>
-                      </Link>
-                    )
-                  })}
-                </>
-              )}
+              <span className="section-label">MENU</span>
+              {mainMenu.map(item => (
+                <NavItem key={item.href} {...item} active={pathname === item.href}
+                  badge={item.href === "/mesajlar" ? unread : 0} collapsed={false} />
+              ))}
+              {showFin && <>
+                <span className="section-label mt-3">MALİYYƏ</span>
+                {finMenu.map(item => <NavItem key={item.href} {...item} active={pathname === item.href} badge={0} collapsed={false} />)}
+              </>}
+              <span className="section-label mt-3">TOOLS</span>
+              {toolsMenu.map(item => <NavItem key={item.href} {...item} active={pathname === item.href} badge={0} collapsed={false} />)}
             </div>
-
-            <div className="p-3" style={{ borderTop: "1px solid var(--border-color)" }}>
-              <button onClick={handleLogout}
-                className="nav-item w-full"
-                style={{ color: "var(--danger)" }}>
-                <LogOut size={15} />
-                <span className="text-xs">Çıxış</span>
+            <div className="p-3" style={{ borderTop: "1px solid var(--sidebar-border)" }}>
+              <button onClick={logout} className="nav-item w-full" style={{ color: "var(--danger)" }}>
+                <LogOut size={15} /><span>Çıxış</span>
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Bottom nav */}
+      {/* Bottom tab bar */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 z-40"
-        style={{ background: "var(--bg-card)", borderTop: "1px solid var(--border-color)", paddingBottom: "env(safe-area-inset-bottom)" }}>
-        <div className="flex items-center justify-around py-2 px-2">
+        style={{ background: "var(--sidebar-bg)", borderTop: "1px solid var(--sidebar-border)", paddingBottom: "env(safe-area-inset-bottom)" }}>
+        <div className="flex items-center justify-around py-1.5 px-3">
           {[
-            MENU.find(m => m.href === "/"),
-            MENU.find(m => m.href === "/bookings"),
-            MENU.find(m => m.href === "/finances") ?? MENU.find(m => m.href === "/mesajlar"),
-            MENU.find(m => m.href === "/mesajlar"),
-          ].filter(Boolean).slice(0, 4).map(item => {
-            if (!item) return null
+            { href: "/", label: "Dashboard", icon: LayoutDashboard },
+            { href: "/bookings", label: "Sifarişlər", icon: ClipboardList },
+            { href: "/finances", label: "Maliyyə", icon: Wallet },
+            { href: "/mesajlar", label: "Mesajlar", icon: MessageCircle },
+          ].map(item => {
             const isActive = pathname === item.href
             const Icon = item.icon
             return (
               <Link key={item.href} href={item.href}
-                className="flex flex-col items-center gap-0.5 px-3 py-1 rounded-xl transition-all"
+                className="flex flex-col items-center gap-0.5 px-2 py-1 rounded-lg transition-all"
                 style={{ color: isActive ? "var(--accent)" : "var(--text-muted)" }}>
-                <Icon size={20} strokeWidth={isActive ? 2.2 : 1.6} />
+                <Icon size={19} strokeWidth={isActive ? 2.2 : 1.6} />
                 <span style={{ fontSize: "10px", fontWeight: isActive ? 600 : 400 }}>{item.label}</span>
               </Link>
             )
           })}
-          <button onClick={() => setOpen(true)}
-            className="flex flex-col items-center gap-0.5 px-3 py-1 rounded-xl"
-            style={{ color: "var(--text-muted)" }}>
-            <Menu size={20} strokeWidth={1.6} />
+          <button onClick={() => setOpen(true)} className="flex flex-col items-center gap-0.5 px-2 py-1 rounded-lg" style={{ color: "var(--text-muted)" }}>
+            <Menu size={19} strokeWidth={1.6} />
             <span style={{ fontSize: "10px" }}>Menyu</span>
           </button>
         </div>
@@ -240,123 +203,102 @@ export function MobileNav() {
   )
 }
 
-// ── Desktop Sidebar ──────────────────────────────────────────
+// ── Desktop Sidebar ───────────────────────────────────────────
 export default function Sidebar() {
   const pathname = usePathname()
   const router = useRouter()
   const { profile } = useUserRole()
   const { demo, toggleDemo } = useDemo()
-  const [expanded, setExpanded] = useState(true)
-  const [financeExpanded, setFinanceExpanded] = useState(false)
+  const [collapsed, setCollapsed] = useState(false)
+  const [finOpen, setFinOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
   const unread = useUnread(profile?.id)
 
   useEffect(() => {
     setMounted(true)
-    const saved = localStorage.getItem("sidebar_expanded")
-    if (saved !== null) setExpanded(saved === "1")
-    // Auto-expand finance if on finance page
+    const c = localStorage.getItem("sb_collapsed")
+    if (c !== null) setCollapsed(c === "1")
     const finPaths = ["/finances","/debts","/creditors","/balances","/iata"]
-    if (finPaths.some(p => pathname === p)) setFinanceExpanded(true)
+    if (finPaths.includes(pathname)) setFinOpen(true)
   }, [])
 
-  function toggleSidebar() {
-    const next = !expanded
-    setExpanded(next)
-    localStorage.setItem("sidebar_expanded", next ? "1" : "0")
+  function toggle() {
+    const next = !collapsed
+    setCollapsed(next)
+    localStorage.setItem("sb_collapsed", next ? "1" : "0")
   }
 
-  async function handleLogout() {
-    await supabase.auth.signOut()
-    router.push("/login"); router.refresh()
-  }
+  async function logout() { await supabase.auth.signOut(); router.push("/login"); router.refresh() }
 
   if (!mounted) return (
-    <div className="hidden md:block" style={{ width: 56, minHeight: "100vh", background: "var(--sidebar-bg)", borderRight: "1px solid var(--sidebar-border)" }} />
+    <div className="hidden md:block flex-shrink-0" style={{ width: 56, minHeight: "100vh", background: "var(--sidebar-bg)", borderRight: "1px solid var(--sidebar-border)" }} />
   )
 
-  const MENU = ALL_MENU.filter(m => !profile || m.roles.includes(profile.role))
-  const showFinance = profile && FINANCE_ROLES.includes(profile.role)
-  const finMenu = profile?.role === "bilet_menecer"
-    ? FINANCE_MENU.filter(f => f.href === "/iata")
-    : FINANCE_MENU
+  const mainMenu = MAIN_MENU.filter(m => !profile || m.roles.includes(profile.role))
+  const toolsMenu = TOOLS_MENU.filter(m => !profile || m.roles.includes(profile.role))
+  const showFin = profile && FINANCE_ROLES.includes(profile.role)
+  const finMenu = profile?.role === "bilet_menecer" ? FINANCE_MENU.filter(f => f.href === "/iata") : FINANCE_MENU
   const isFinActive = finMenu.some(f => pathname === f.href)
-
-  // Split menu — before finance group and after
-  const mainMenu = MENU.filter(m => !["/settings","/help","/logs","/founder"].includes(m.href))
-  const bottomMenu = MENU.filter(m => ["/settings","/help","/founder"].includes(m.href))
-  const adminMenu = MENU.filter(m => ["/logs"].includes(m.href))
-
-  const accentColor = ROLE_COLORS[profile?.role ?? ""] ?? "var(--accent)"
   const initials = profile?.fullName?.split(" ").map((w: string) => w[0]).join("").toUpperCase().slice(0, 2) ?? "?"
+  const roleColor = ROLE_COLOR[profile?.role ?? ""] ?? "var(--accent)"
+  const w = collapsed ? 56 : 220
 
   return (
     <>
       <div className="hidden md:flex flex-col fixed top-0 left-0 h-full z-40"
-        style={{
-          width: expanded ? 220 : 56,
-          background: "var(--sidebar-bg)",
-          borderRight: "1px solid var(--sidebar-border)",
-          transition: "width 0.22s cubic-bezier(0.4,0,0.2,1)",
-          overflow: "hidden",
-        }}>
+        style={{ width: w, background: "var(--sidebar-bg)", borderRight: "1px solid var(--sidebar-border)", transition: "width 0.22s cubic-bezier(0.4,0,0.2,1)", overflow: "hidden" }}>
 
-        {/* ── Logo ── */}
-        <div className="flex items-center h-14 px-3 flex-shrink-0"
-          style={{ borderBottom: "1px solid var(--sidebar-border)", justifyContent: expanded ? "space-between" : "center" }}>
-          {expanded && (
-            <div className="flex items-center gap-2 overflow-hidden">
-              <div className="flex items-center gap-1">
-                <span className="font-black text-base tracking-tight" style={{ color: "var(--accent)" }}>its</span>
-                <span className="font-black text-base tracking-tight" style={{ color: "var(--text-primary)" }}>tour</span>
-              </div>
-              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded"
-                style={{ background: "var(--accent-light)", color: "var(--accent)", letterSpacing: "0.05em" }}>
-                CRM
-              </span>
-            </div>
+        {/* Logo */}
+        <div className="flex items-center h-[60px] px-3 flex-shrink-0"
+          style={{ borderBottom: "1px solid var(--sidebar-border)", justifyContent: collapsed ? "center" : "space-between" }}>
+          {!collapsed && (
+            <Image src="/logo.png" alt="ITS Tour" width={90} height={30}
+              style={{ objectFit: "contain", objectPosition: "left" }} priority />
           )}
-          <button onClick={toggleSidebar}
+          <button onClick={toggle}
             className="w-7 h-7 flex items-center justify-center rounded-lg flex-shrink-0 transition-all hover:scale-110"
             style={{ color: "var(--text-muted)", background: "var(--bg-hover)" }}>
-            {expanded ? <ChevronLeft size={13} /> : <ChevronRight size={13} />}
+            {collapsed ? <ChevronRight size={13} /> : <ChevronLeft size={13} />}
           </button>
         </div>
 
-        {/* ── Nav ── */}
-        <div className="flex-1 overflow-y-auto overflow-x-hidden py-3 px-2 space-y-0.5">
+        {/* Nav */}
+        <div className="flex-1 overflow-y-auto overflow-x-hidden py-4 px-2 space-y-0.5">
 
-          {/* Main items */}
+          {/* Main menu */}
+          {!collapsed && <span className="section-label">MENU</span>}
           {mainMenu.map(item => (
-            <NavItem key={item.href} item={item} expanded={expanded} pathname={pathname}
-              badge={item.href === "/mesajlar" ? unread : undefined} />
+            <div key={item.href} className="relative group">
+              <NavItem href={item.href} label={item.label} icon={item.icon}
+                active={pathname === item.href}
+                badge={item.href === "/mesajlar" ? unread : 0}
+                collapsed={collapsed} />
+            </div>
           ))}
 
           {/* Finance section */}
-          {showFinance && (
-            <div className="pt-2">
-              {expanded && <div className="section-label mb-1">Maliyyə</div>}
-              {!expanded && <div className="h-px mx-2 my-2" style={{ background: "var(--border-color)" }} />}
+          {showFin && (
+            <div className="pt-3">
+              {!collapsed && <span className="section-label">MALİYYƏ</span>}
+              {collapsed && <div className="h-px my-2 mx-1" style={{ background: "var(--border-color)" }} />}
 
-              {expanded ? (
+              {!collapsed ? (
                 <>
-                  <button
-                    onClick={() => setFinanceExpanded(v => !v)}
+                  <button onClick={() => setFinOpen(v => !v)}
                     className={`nav-item w-full ${isFinActive ? "active" : ""}`}>
-                    <Wallet size={16} strokeWidth={1.8} />
-                    <span className="flex-1 text-xs">Maliyyə</span>
-                    <ChevronRight size={12} style={{ transform: financeExpanded ? "rotate(90deg)" : "rotate(0)", transition: "transform 0.2s ease", opacity: 0.5 }} />
+                    <Wallet size={15} strokeWidth={1.8} />
+                    <span className="flex-1 text-[13px]">Maliyyə</span>
+                    <ChevronDown size={12} style={{ opacity: 0.5, transform: finOpen ? "rotate(180deg)" : "rotate(0)", transition: "transform 0.2s" }} />
                   </button>
-                  {financeExpanded && (
-                    <div className="ml-3 pl-3 mt-0.5 space-y-0.5" style={{ borderLeft: "1px solid var(--border-color)" }}>
+                  {finOpen && (
+                    <div className="mt-1 ml-4 pl-3 space-y-0.5" style={{ borderLeft: "1.5px solid var(--border-color)" }}>
                       {finMenu.map(item => {
-                        const isActive = pathname === item.href
                         const Icon = item.icon
                         return (
                           <Link key={item.href} href={item.href}
-                            className={`nav-item ${isActive ? "active" : ""}`}>
+                            className={`nav-item ${pathname === item.href ? "active" : ""}`}>
                             <Icon size={13} strokeWidth={1.8} />
-                            <span className="text-xs">{item.label}</span>
+                            <span className="text-[12px]">{item.label}</span>
                           </Link>
                         )
                       })}
@@ -365,65 +307,61 @@ export default function Sidebar() {
                 </>
               ) : (
                 finMenu.map(item => (
-                  <NavItem key={item.href} item={item} expanded={false} pathname={pathname} />
+                  <div key={item.href} className="relative group">
+                    <NavItem href={item.href} label={item.label} icon={item.icon} active={pathname === item.href} badge={0} collapsed={true} />
+                  </div>
                 ))
               )}
             </div>
           )}
 
-          {/* Admin */}
-          {adminMenu.length > 0 && (
-            <div className="pt-2">
-              {expanded && <div className="section-label mb-1">Admin</div>}
-              {adminMenu.map(item => (
-                <NavItem key={item.href} item={item} expanded={expanded} pathname={pathname} />
-              ))}
-            </div>
-          )}
+          {/* Tools */}
+          <div className="pt-3">
+            {!collapsed && <span className="section-label">TOOLS</span>}
+            {collapsed && <div className="h-px my-2 mx-1" style={{ background: "var(--border-color)" }} />}
+            {toolsMenu.map(item => (
+              <div key={item.href} className="relative group">
+                <NavItem href={item.href} label={item.label} icon={item.icon} active={pathname === item.href} badge={0} collapsed={collapsed} />
+              </div>
+            ))}
+          </div>
         </div>
 
-        {/* ── Bottom ── */}
-        <div className="px-2 py-3 space-y-0.5 flex-shrink-0" style={{ borderTop: "1px solid var(--sidebar-border)" }}>
-          {bottomMenu.map(item => (
-            <NavItem key={item.href} item={item} expanded={expanded} pathname={pathname} />
-          ))}
+        {/* Bottom */}
+        <div className="flex-shrink-0 p-2 space-y-1" style={{ borderTop: "1px solid var(--sidebar-border)" }}>
+          {/* Demo */}
+          <div className="relative group">
+            <button onClick={toggleDemo}
+              className={`nav-item w-full ${demo ? "active" : ""}`}
+              style={{ justifyContent: collapsed ? "center" : "flex-start" }}>
+              <span style={{ fontSize: 14 }}>🎬</span>
+              {!collapsed && <span className="text-[13px] flex-1">Demo{demo ? ": ON" : ""}</span>}
+            </button>
+          </div>
 
-          {/* Demo toggle */}
-          <button onClick={toggleDemo}
-            className={`nav-item w-full ${demo ? "active" : ""}`}
-            style={{ justifyContent: expanded ? "flex-start" : "center" }}>
-            <span style={{ fontSize: 14, lineHeight: 1 }}>🎬</span>
-            {expanded && <span className="text-xs flex-1">Demo{demo ? ": ON" : ""}</span>}
-            {!expanded && <div className="tooltip">Demo rejimi</div>}
-          </button>
-
-          <div className="flex items-center gap-1.5 pt-1" style={{ flexDirection: expanded ? "row" : "column" }}>
+          {/* Theme + logout row */}
+          <div className="flex items-center gap-1" style={{ flexDirection: collapsed ? "column" : "row" }}>
             <ThemeToggle />
-            <button onClick={handleLogout}
+            <button onClick={logout}
               className="nav-item flex-1"
-              style={{
-                justifyContent: expanded ? "flex-start" : "center",
-                color: "var(--text-secondary)",
-                flex: expanded ? 1 : "none",
-                width: expanded ? "auto" : 36, height: 32,
-              }}
+              style={{ justifyContent: collapsed ? "center" : "flex-start", color: "var(--text-muted)" }}
               onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = "var(--danger)"}
-              onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = "var(--text-secondary)"}>
+              onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = "var(--text-muted)"}>
               <LogOut size={14} strokeWidth={1.8} />
-              {expanded && <span className="text-xs">Çıxış</span>}
+              {!collapsed && <span className="text-[13px]">Çıxış</span>}
             </button>
           </div>
 
           {/* Profile */}
-          {expanded && (
-            <div className="flex items-center gap-2.5 px-2 py-2 rounded-xl mt-1"
-              style={{ background: "var(--bg-hover)" }}>
+          {!collapsed ? (
+            <div className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg"
+              style={{ background: "var(--bg-hover)", borderRadius: "var(--radius)" }}>
               <div className="w-7 h-7 rounded-lg flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
-                style={{ background: accentColor }}>
+                style={{ background: roleColor }}>
                 {initials}
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-xs font-semibold truncate" style={{ color: "var(--text-primary)", lineHeight: 1.3 }}>
+                <p className="text-[12px] font-semibold truncate leading-tight" style={{ color: "var(--text-primary)" }}>
                   {profile?.fullName ?? "..."}
                 </p>
                 <p className="text-[10px] truncate" style={{ color: "var(--text-muted)" }}>
@@ -431,11 +369,10 @@ export default function Sidebar() {
                 </p>
               </div>
             </div>
-          )}
-          {!expanded && (
-            <div className="flex justify-center pt-1">
+          ) : (
+            <div className="flex justify-center">
               <div className="w-7 h-7 rounded-lg flex items-center justify-center text-white text-xs font-bold"
-                style={{ background: accentColor }}>
+                style={{ background: roleColor }}>
                 {initials}
               </div>
             </div>
@@ -444,8 +381,7 @@ export default function Sidebar() {
       </div>
 
       {/* Spacer */}
-      <div className="hidden md:block flex-shrink-0"
-        style={{ width: expanded ? 220 : 56, transition: "width 0.22s cubic-bezier(0.4,0,0.2,1)" }} />
+      <div className="hidden md:block flex-shrink-0" style={{ width: w, transition: "width 0.22s cubic-bezier(0.4,0,0.2,1)" }} />
     </>
   )
 }
