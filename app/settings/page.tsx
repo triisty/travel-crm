@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react"
 import { supabase } from "@/lib/supabase"
-import { Camera, Save, Eye, EyeOff } from "lucide-react"
+import { Camera, Save, Eye, EyeOff, Power, PowerOff } from "lucide-react"
 
 const card = { background: "var(--bg-card)", border: "1px solid var(--border-color)", backdropFilter: "blur(20px)", borderRadius: "24px" }
 const inputStyle = { background: "var(--bg-glass)", border: "1px solid var(--border-color)", color: "var(--text-primary)", borderRadius: "12px", padding: "10px 16px", fontSize: "14px", outline: "none", width: "100%" }
@@ -21,6 +21,8 @@ export default function SettingsPage() {
   const [message, setMessage] = useState("")
   const [passwordMessage, setPasswordMessage] = useState("")
   const [ready, setReady] = useState(false)
+  const [maintenanceMode, setMaintenanceMode] = useState(false)
+  const [maintenanceLoading, setMaintenanceLoading] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -29,6 +31,9 @@ export default function SettingsPage() {
       if (!user) { setReady(true); return }
       const { data } = await supabase.from("user_profiles").select("*").eq("id", user.id).single()
       if (data) { setProfile(data); setFullName(data.full_name ?? ""); setPhone(data.phone ?? ""); setPosition(data.position ?? ""); setAvatarUrl(data.avatar_url ?? "") }
+      // Load maintenance mode
+      const { data: setting } = await supabase.from("system_settings").select("value").eq("key", "maintenance_mode").single()
+      if (setting) setMaintenanceMode(setting.value === "true")
       setReady(true)
     }
     load()
@@ -43,6 +48,15 @@ export default function SettingsPage() {
     if (error) { setMessage("Şəkil yüklənmədi: " + error.message); return }
     const { data: { publicUrl } } = supabase.storage.from("avatars").getPublicUrl(path)
     setAvatarUrl(publicUrl); setMessage("✅ Şəkil yükləndi!")
+  }
+
+  async function toggleMaintenance() {
+    if (!confirm(maintenanceMode ? "Sistemi işə salmaq istəyirsiniz?" : "Sistemi dayandırmaq istəyirsiniz? Bütün istifadəçilər çıxarılacaq.")) return
+    setMaintenanceLoading(true)
+    const newVal = !maintenanceMode
+    await supabase.from("system_settings").update({ value: String(newVal), updated_at: new Date().toISOString() }).eq("key", "maintenance_mode")
+    setMaintenanceMode(newVal)
+    setMaintenanceLoading(false)
   }
 
   async function handleSaveProfile() {
@@ -114,7 +128,7 @@ export default function SettingsPage() {
         </div>
 
         {/* Change Password */}
-        <div className="p-6" style={card}>
+        <div className="p-6 mb-4" style={card}>
           <h2 className="text-base font-semibold mb-4" style={{ color: "var(--text-primary)" }}>Şifrəni Dəyiş</h2>
           <div className="space-y-4">
             <div>
@@ -136,6 +150,42 @@ export default function SettingsPage() {
             <Save size={16} />{passwordLoading ? "Dəyişdirilir..." : "Şifrəni dəyiş"}
           </button>
         </div>
+
+        {/* Maintenance Mode — only for it_admin */}
+        {profile?.role === "it_admin" && (
+          <div className="p-6" style={{ ...card, border: maintenanceMode ? "1px solid rgba(239,68,68,0.3)" : "1px solid var(--border-color)" }}>
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-base font-semibold" style={{ color: "var(--text-primary)" }}>
+                  Sistem İdarəetməsi
+                </h2>
+                <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
+                  {maintenanceMode
+                    ? "🔴 Sistem hal-hazırda dayandırılıb. Yalnız siz daxil ola bilərsiniz."
+                    : "🟢 Sistem aktiv vəziyyətdədir. Bütün istifadəçilər daxil ola bilər."}
+                </p>
+              </div>
+              <button onClick={toggleMaintenance} disabled={maintenanceLoading}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-2xl text-sm font-semibold text-white disabled:opacity-50 transition-all hover:scale-[1.02] active:scale-95"
+                style={{
+                  background: maintenanceMode
+                    ? "linear-gradient(135deg,#22c55e,#16a34a)"
+                    : "linear-gradient(135deg,#ef4444,#dc2626)",
+                  boxShadow: maintenanceMode
+                    ? "0 4px 16px rgba(34,197,94,0.3)"
+                    : "0 4px 16px rgba(239,68,68,0.3)"
+                }}>
+                {maintenanceLoading ? (
+                  <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                ) : maintenanceMode ? (
+                  <><Power size={15} />Sistemi işə sal</>
+                ) : (
+                  <><PowerOff size={15} />Sistemi dayandır</>
+                )}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
