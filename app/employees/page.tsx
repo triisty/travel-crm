@@ -8,7 +8,7 @@ import {
   Plus, Trash2, Users, TrendingUp, DollarSign, Award,
   CheckCircle2, Clock, X, ChevronLeft, ChevronRight,
   Edit3, Gift, AlertCircle, Wallet, BarChart3, ClipboardList,
-  Calendar, Star
+  Calendar, Star, ArrowLeft, Eye, Search
 } from "lucide-react"
 
 interface Employee {
@@ -93,6 +93,388 @@ const STATUS_CONFIG = {
   none:    { label: "Bonus yoxdur",    color: "#9ca3af", bg: "var(--bg-glass)",          Icon: Gift },
 }
 
+// ─── Employee Detail View ─────────────────────────────────────
+function EmployeeDetail({ emp, bookings, allPayments, onBack, onEdit, idx }: {
+  emp: Employee; bookings: any[]; allPayments: EmployeePayment[]; onBack: () => void; onEdit: (emp: Employee) => void; idx: number
+}) {
+  const [search, setSearch] = useState("")
+  const [dateFrom, setDateFrom] = useState("")
+  const [dateTo, setDateTo] = useState("")
+  const [viewBooking, setViewBooking] = useState<any>(null)
+  const [editBooking, setEditBooking] = useState<any>(null)
+  const [saving, setSaving] = useState(false)
+  const [editForm, setEditForm] = useState<any>({})
+
+  const myBookings = useMemo(() => {
+    return bookings.filter(b => {
+      if (b.manager !== emp.name) return false
+      if (search) {
+        const q = search.toLowerCase()
+        if (!(b.clientName ?? "").toLowerCase().includes(q) && !(b.destination ?? "").toLowerCase().includes(q)) return false
+      }
+      if (dateFrom) { const d = new Date(b.createdAt); if (d < new Date(dateFrom + "T00:00:00")) return false }
+      if (dateTo)   { const d = new Date(b.createdAt); if (d > new Date(dateTo + "T23:59:59")) return false }
+      return true
+    })
+  }, [bookings, emp.name, search, dateFrom, dateTo])
+
+  const totalRev    = myBookings.reduce((s, b) => s + b.sellPrice, 0)
+  const totalBuy    = myBookings.reduce((s, b) => s + b.buyPrice, 0)
+  const grossProfit = myBookings.reduce((s, b) => s + b.profit + b.commissionAmount, 0)
+  const totalBonus  = Math.round(grossProfit * (emp.commissionPercent / 100) * 100) / 100
+  const totalProfit = myBookings.reduce((s, b) => s + b.profit, 0)
+  const unpaidCount = myBookings.filter(b => b.paymentStatus !== "paid").length
+
+  function openEdit(b: any) {
+    setEditForm({
+      clientName: b.clientName ?? "", clientPhone: b.clientPhone ?? "",
+      destination: b.destination ?? "", departureDate: b.departureDate ?? "",
+      returnDate: b.returnDate ?? "", travelers: b.travelers ?? 1,
+      bookingType: b.bookingType ?? "bilet",
+      buyPrice: b.buyPrice ?? 0, sellPrice: b.sellPrice ?? 0,
+      commissionPercent: b.commissionPercent ?? 10,
+      vendor: b.vendor ?? "", pnr: b.pnr ?? "",
+      ticketNumber: b.ticketNumber ?? "", notes: b.notes ?? "",
+      status: b.status ?? "pending", paymentStatus: b.paymentStatus ?? "unpaid",
+      paidAmount: b.paidAmount ?? 0,
+    })
+    setEditBooking(b)
+    setViewBooking(null)
+  }
+
+  async function handleSaveEdit() {
+    if (!editBooking) return
+    setSaving(true)
+    const gross = Number(editForm.sellPrice) - Number(editForm.buyPrice)
+    const commAmt = Math.round(gross * (Number(editForm.commissionPercent) / 100) * 100) / 100
+    const profit  = gross - commAmt
+    await supabase.from("bookings").update({
+      client_name: editForm.clientName, client_phone: editForm.clientPhone,
+      destination: editForm.destination, departure_date: editForm.departureDate,
+      return_date: editForm.returnDate, travelers: Number(editForm.travelers),
+      booking_type: editForm.bookingType,
+      buy_price: Number(editForm.buyPrice), sell_price: Number(editForm.sellPrice),
+      commission_percent: Number(editForm.commissionPercent),
+      commission_amount: commAmt, profit,
+      vendor: editForm.vendor, pnr: editForm.pnr,
+      ticket_number: editForm.ticketNumber, notes: editForm.notes,
+      status: editForm.status, payment_status: editForm.paymentStatus,
+      paid_amount: Number(editForm.paidAmount),
+    }).eq("id", editBooking.id)
+    setSaving(false)
+    setEditBooking(null)
+    // Refresh store
+    const { useBookingsStore: bs } = await import("@/lib/store/bookingsStore")
+    bs.getState().fetchBookings()
+  }
+
+  const inpStyle = { background: "var(--bg-glass)", border: "1px solid var(--border-color)", color: "var(--text-primary)", borderRadius: "10px", padding: "9px 12px", fontSize: "13px", outline: "none", width: "100%" }
+
+  return (
+    <div className="min-h-screen p-5 md:p-6" style={{ background: "var(--bg-primary)" }}>
+      {/* Back */}
+      <button onClick={onBack}
+        className="flex items-center gap-2 text-sm font-medium mb-5 transition-all hover:opacity-70"
+        style={{ color: "var(--text-secondary)" }}>
+        <ArrowLeft size={15} />Geri
+      </button>
+
+      {/* Header */}
+      <div className="flex items-start justify-between mb-6">
+        <div className="flex items-center gap-4">
+          <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-xl font-black text-white flex-shrink-0"
+            style={{ background: GRADIENTS[idx % GRADIENTS.length] }}>
+            {emp.name.charAt(0)}
+          </div>
+          <div>
+            <h1 className="text-xl font-black" style={{ color: "var(--text-primary)" }}>{emp.name}</h1>
+            <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+              {emp.position || "Menecer"} · {emp.commissionPercent}% komissiya · {formatCurrency(emp.baseSalary)} maaş
+            </p>
+          </div>
+        </div>
+        <button onClick={() => onEdit(emp)}
+          className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-all hover:scale-[1.02]"
+          style={{ background: "linear-gradient(135deg,#6366f1,#8b5cf6)" }}>
+          <Edit3 size={13} />Düzəlt
+        </button>
+      </div>
+
+      {/* KPI */}
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-5">
+        {[
+          { label: "Satış həcmi",  value: formatCurrency(totalRev),    color: "#6366f1" },
+          { label: "Alış xərci",   value: formatCurrency(totalBuy),    color: "#ef4444" },
+          { label: "Mənfəət",      value: formatCurrency(totalProfit), color: "#22c55e" },
+          { label: `Bonus (${emp.commissionPercent}%)`, value: formatCurrency(totalBonus), color: "#f59e0b" },
+          { label: "Ödənilməyib",  value: unpaidCount + " sifariş",   color: "#ef4444" },
+        ].map(({ label, value, color }) => (
+          <div key={label} className="p-4 rounded-2xl" style={card}>
+            <p className="text-xs font-medium mb-1" style={{ color: "var(--text-muted)" }}>{label}</p>
+            <p className="text-lg font-black tabular-nums" style={{ color }}>{value}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Filters */}
+      <div className="flex flex-wrap gap-3 mb-4">
+        <div className="flex items-center gap-2 px-3 py-2 rounded-xl flex-1 min-w-[180px]"
+          style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+          <Search size={13} style={{ color: "var(--text-muted)", flexShrink: 0 }} />
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Müştəri, istiqamət..."
+            className="bg-transparent text-xs outline-none w-full" style={{ color: "var(--text-primary)" }} />
+          {search && <button onClick={() => setSearch("")}><X size={11} style={{ color: "var(--text-muted)" }} /></button>}
+        </div>
+        <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
+          className="px-3 py-2 rounded-xl text-xs outline-none"
+          style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} />
+        <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
+          className="px-3 py-2 rounded-xl text-xs outline-none"
+          style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} />
+        {(dateFrom || dateTo) && (
+          <button onClick={() => { setDateFrom(""); setDateTo("") }}
+            className="px-3 py-2 rounded-xl text-xs font-medium"
+            style={{ background: "rgba(239,68,68,0.1)", color: "#ef4444" }}>
+            Sıfırla
+          </button>
+        )}
+        <span className="px-3 py-2 text-xs font-medium" style={{ color: "var(--text-muted)" }}>
+          {myBookings.length} sifariş
+        </span>
+      </div>
+
+      {/* Bookings table */}
+      <div className="rounded-2xl overflow-hidden" style={card}>
+        {myBookings.length === 0 ? (
+          <div className="flex flex-col items-center py-16 gap-3">
+            <ClipboardList size={32} style={{ color: "var(--text-muted)" }} />
+            <p className="text-sm" style={{ color: "var(--text-muted)" }}>Sifariş tapılmadı</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr style={{ background: "linear-gradient(135deg,var(--bg-glass),var(--bg-secondary))", borderBottom: "1px solid var(--border-color)" }}>
+                  {["Müştəri","İstiqamət","Növ","Tarix","Satış","Alış","Mənfəət","Bonus","Ödəniş","Status",""].map(h => (
+                    <th key={h} className="text-left text-[10px] font-bold uppercase tracking-wider px-3 py-3"
+                      style={{ color: "var(--text-muted)" }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {myBookings.map(b => {
+                  const gross = b.profit + b.commissionAmount
+                  const bBonus = Math.round(gross * (emp.commissionPercent / 100) * 100) / 100
+                  return (
+                    <tr key={b.id} className="group transition-all" style={{ borderBottom: "1px solid var(--border-color)" }}
+                      onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "var(--bg-hover)"}
+                      onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = "transparent"}>
+                      <td className="px-3 py-2.5">
+                        <p className="font-semibold text-xs demo-name" style={{ color: "var(--text-primary)" }}>{b.clientName}</p>
+                        {b.clientPhone && <p className="text-[10px] demo-phone" style={{ color: "var(--text-muted)" }}>{b.clientPhone}</p>}
+                      </td>
+                      <td className="px-3 py-2.5 text-xs" style={{ color: "var(--text-secondary)", maxWidth: 130 }}>
+                        <p className="truncate">{b.destination}</p>
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-lg"
+                          style={{ background: "var(--bg-glass)", color: "var(--text-secondary)", border: "1px solid var(--border-color)" }}>
+                          {b.bookingType}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2.5 text-xs whitespace-nowrap" style={{ color: "var(--text-muted)" }}>
+                        {b.departureDate}
+                      </td>
+                      <td className="px-3 py-2.5 text-xs font-bold tabular-nums text-right" style={{ color: "var(--text-primary)" }}>
+                        {formatCurrency(b.sellPrice)}
+                      </td>
+                      <td className="px-3 py-2.5 text-xs font-semibold tabular-nums text-right text-red-400">
+                        {formatCurrency(b.buyPrice)}
+                      </td>
+                      <td className="px-3 py-2.5 text-xs font-semibold tabular-nums text-right"
+                        style={{ color: b.profit >= 0 ? "#22c55e" : "#ef4444" }}>
+                        {formatCurrency(b.profit)}
+                      </td>
+                      <td className="px-3 py-2.5 text-xs font-bold tabular-nums text-right" style={{ color: "#f59e0b" }}>
+                        +{formatCurrency(bBonus)}
+                      </td>
+                      <td className="px-3 py-2.5">
+                        {b.paymentStatus === "paid"
+                          ? <span className="text-[10px] font-bold px-2 py-0.5 rounded-lg" style={{ background: "rgba(34,197,94,0.1)", color: "#22c55e" }}>Ödənilib</span>
+                          : b.paymentStatus === "partial"
+                          ? <span className="text-[10px] font-bold px-2 py-0.5 rounded-lg" style={{ background: "rgba(249,115,22,0.1)", color: "#f97316" }}>Qismən</span>
+                          : <span className="text-[10px] font-bold px-2 py-0.5 rounded-lg" style={{ background: "rgba(239,68,68,0.1)", color: "#ef4444" }}>Ödənilməyib</span>}
+                      </td>
+                      <td className="px-3 py-2.5">
+                        {b.status === "confirmed"
+                          ? <span className="text-[10px] font-bold px-2 py-0.5 rounded-lg" style={{ background: "rgba(34,197,94,0.1)", color: "#22c55e" }}>Təsdiqlənib</span>
+                          : b.status === "cancelled"
+                          ? <span className="text-[10px] font-bold px-2 py-0.5 rounded-lg" style={{ background: "rgba(239,68,68,0.1)", color: "#ef4444" }}>Ləğv</span>
+                          : <span className="text-[10px] font-bold px-2 py-0.5 rounded-lg" style={{ background: "rgba(245,158,11,0.1)", color: "#f59e0b" }}>Gözləyir</span>}
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                          <button onClick={() => setViewBooking(b)}
+                            className="p-1.5 rounded-lg transition-all hover:scale-110"
+                            style={{ background: "rgba(99,102,241,0.1)", color: "#6366f1" }}>
+                            <Eye size={12} />
+                          </button>
+                          <button onClick={() => openEdit(b)}
+                            className="p-1.5 rounded-lg transition-all hover:scale-110"
+                            style={{ background: "var(--bg-glass)", color: "var(--text-secondary)" }}>
+                            <Edit3 size={12} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+              {/* Footer total */}
+              <tfoot>
+                <tr style={{ borderTop: "2px solid var(--border-color)", background: "var(--bg-glass)" }}>
+                  <td className="px-3 py-3 text-xs font-bold" style={{ color: "var(--text-secondary)" }} colSpan={4}>CƏMI ({myBookings.length} sifariş)</td>
+                  <td className="px-3 py-3 text-xs font-black tabular-nums text-right" style={{ color: "var(--text-primary)" }}>{formatCurrency(totalRev)}</td>
+                  <td className="px-3 py-3 text-xs font-black tabular-nums text-right text-red-400">{formatCurrency(totalBuy)}</td>
+                  <td className="px-3 py-3 text-xs font-black tabular-nums text-right text-green-500">{formatCurrency(totalProfit)}</td>
+                  <td className="px-3 py-3 text-xs font-black tabular-nums text-right" style={{ color: "#f59e0b" }}>+{formatCurrency(totalBonus)}</td>
+                  <td colSpan={3} />
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* View Modal */}
+      {viewBooking && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" style={{ backdropFilter: "blur(8px)" }}>
+          <div className="w-full max-w-lg p-6 max-h-[85vh] overflow-y-auto" style={modalCard}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-base font-bold" style={{ color: "var(--text-primary)" }}>{viewBooking.clientName}</h2>
+              <div className="flex items-center gap-2">
+                <button onClick={() => openEdit(viewBooking)}
+                  className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl text-white"
+                  style={{ background: "linear-gradient(135deg,#6366f1,#8b5cf6)" }}>
+                  <Edit3 size={12} />Düzəlt
+                </button>
+                <button onClick={() => setViewBooking(null)} style={{ color: "var(--text-muted)" }}><X size={18} /></button>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                ["Müştəri", viewBooking.clientName],
+                ["Telefon", viewBooking.clientPhone || "—"],
+                ["İstiqamət", viewBooking.destination],
+                ["Növ", viewBooking.bookingType],
+                ["Getmə tarixi", viewBooking.departureDate],
+                ["Qayıdış tarixi", viewBooking.returnDate || "—"],
+                ["Səyahətçi", viewBooking.travelers + " nəfər"],
+                ["Vendor", viewBooking.vendor || "—"],
+                ["PNR", viewBooking.pnr || "—"],
+                ["Bilet №", viewBooking.ticketNumber || "—"],
+                ["Satış qiyməti", formatCurrency(viewBooking.sellPrice)],
+                ["Alış qiyməti", formatCurrency(viewBooking.buyPrice)],
+                ["Mənfəət", formatCurrency(viewBooking.profit)],
+                [`Bonus (${emp.commissionPercent}%)`, formatCurrency(Math.round((viewBooking.profit + viewBooking.commissionAmount) * emp.commissionPercent / 100 * 100) / 100)],
+                ["Ödənilib", formatCurrency(viewBooking.paidAmount ?? 0)],
+                ["Qalıq", formatCurrency(viewBooking.sellPrice - (viewBooking.paidAmount ?? 0))],
+              ].map(([label, value]) => (
+                <div key={label} className="p-3 rounded-xl" style={{ background: "var(--bg-glass)", border: "1px solid var(--border-color)" }}>
+                  <p className="text-[10px] font-medium mb-0.5" style={{ color: "var(--text-muted)" }}>{label}</p>
+                  <p className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>{value}</p>
+                </div>
+              ))}
+            </div>
+            {viewBooking.notes && (
+              <div className="mt-3 p-3 rounded-xl" style={{ background: "var(--bg-glass)", border: "1px solid var(--border-color)" }}>
+                <p className="text-[10px] font-medium mb-1" style={{ color: "var(--text-muted)" }}>Qeyd</p>
+                <p className="text-sm" style={{ color: "var(--text-primary)" }}>{viewBooking.notes}</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Edit Modal */}
+      {editBooking && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" style={{ backdropFilter: "blur(8px)" }}>
+          <div className="w-full max-w-xl p-6 max-h-[90vh] overflow-y-auto" style={modalCard}>
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-base font-bold" style={{ color: "var(--text-primary)" }}>Sifarişi düzəlt</h2>
+              <button onClick={() => setEditBooking(null)} style={{ color: "var(--text-muted)" }}><X size={18} /></button>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                { label: "Müştəri adı", key: "clientName", type: "text" },
+                { label: "Telefon", key: "clientPhone", type: "text" },
+                { label: "İstiqamət", key: "destination", type: "text" },
+                { label: "Getmə tarixi", key: "departureDate", type: "date" },
+                { label: "Qayıdış tarixi", key: "returnDate", type: "date" },
+                { label: "Səyahətçi sayı", key: "travelers", type: "number" },
+                { label: "Alış qiyməti", key: "buyPrice", type: "number" },
+                { label: "Satış qiyməti", key: "sellPrice", type: "number" },
+                { label: "Komissiya %", key: "commissionPercent", type: "number" },
+                { label: "Ödənilib", key: "paidAmount", type: "number" },
+                { label: "Vendor", key: "vendor", type: "text" },
+                { label: "PNR", key: "pnr", type: "text" },
+                { label: "Bilet №", key: "ticketNumber", type: "text" },
+              ].map(({ label, key, type }) => (
+                <div key={key}>
+                  <label className="text-[10px] font-semibold mb-1 block" style={{ color: "var(--text-muted)" }}>{label}</label>
+                  <input type={type} value={editForm[key]} onChange={e => setEditForm((f: any) => ({ ...f, [key]: e.target.value }))} style={inpStyle} />
+                </div>
+              ))}
+              <div>
+                <label className="text-[10px] font-semibold mb-1 block" style={{ color: "var(--text-muted)" }}>Status</label>
+                <select value={editForm.status} onChange={e => setEditForm((f: any) => ({ ...f, status: e.target.value }))} style={inpStyle}>
+                  <option value="pending">Gözləyir</option>
+                  <option value="confirmed">Təsdiqlənib</option>
+                  <option value="completed">Tamamlandı</option>
+                  <option value="cancelled">Ləğv edildi</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-[10px] font-semibold mb-1 block" style={{ color: "var(--text-muted)" }}>Ödəniş statusu</label>
+                <select value={editForm.paymentStatus} onChange={e => setEditForm((f: any) => ({ ...f, paymentStatus: e.target.value }))} style={inpStyle}>
+                  <option value="unpaid">Ödənilməyib</option>
+                  <option value="partial">Qismən</option>
+                  <option value="paid">Ödənilib</option>
+                </select>
+              </div>
+              <div className="col-span-2">
+                <label className="text-[10px] font-semibold mb-1 block" style={{ color: "var(--text-muted)" }}>Qeyd</label>
+                <textarea value={editForm.notes} onChange={e => setEditForm((f: any) => ({ ...f, notes: e.target.value }))}
+                  rows={2} style={{ ...inpStyle, resize: "none" }} />
+              </div>
+            </div>
+            {/* Profit preview */}
+            <div className="mt-3 p-3 rounded-xl flex items-center justify-between"
+              style={{ background: "rgba(99,102,241,0.06)", border: "1px solid rgba(99,102,241,0.15)" }}>
+              <span className="text-xs" style={{ color: "var(--text-secondary)" }}>Mənfəət preview:</span>
+              <span className="text-sm font-bold" style={{ color: "#22c55e" }}>
+                {formatCurrency((Number(editForm.sellPrice) - Number(editForm.buyPrice)) * (1 - Number(editForm.commissionPercent) / 100))}
+              </span>
+            </div>
+            <div className="flex gap-3 mt-4">
+              <button onClick={handleSaveEdit} disabled={saving}
+                className="flex-1 py-3 rounded-2xl text-sm font-semibold text-white disabled:opacity-50 transition-all"
+                style={{ background: "linear-gradient(135deg,#6366f1,#8b5cf6)" }}>
+                {saving ? "Yadda saxlanılır..." : "Yadda saxla"}
+              </button>
+              <button onClick={() => setEditBooking(null)}
+                className="px-5 py-3 rounded-2xl text-sm"
+                style={{ background: "var(--bg-glass)", border: "1px solid var(--border-color)", color: "var(--text-secondary)" }}>
+                Ləğv
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function EmployeesPage() {
   const { bookings, fetchBookings } = useBookingsStore()
   const [employees, setEmployees] = useState<Employee[]>([])
@@ -100,6 +482,7 @@ export default function EmployeesPage() {
   const [allPayments, setAllPayments] = useState<EmployeePayment[]>([])
   const [modal, setModal] = useState(false)
   const [payModal, setPayModal] = useState<{ emp: Employee; payment: EmployeePayment } | null>(null)
+  const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null)
   const [bookingsModal, setBookingsModal] = useState<{ emp: Employee; month: string } | null>(null)
   const [loading, setLoading] = useState(true)
   const [selected, setSelected] = useState<Employee | null>(null)
@@ -273,6 +656,21 @@ export default function EmployeesPage() {
   }
 
   if (!ready) return null
+
+  // Show employee detail view
+  if (selectedEmployee) {
+    const empIdx = employees.findIndex(e => e.id === selectedEmployee.id)
+    return (
+      <EmployeeDetail
+        emp={selectedEmployee}
+        bookings={bookings}
+        allPayments={allPayments}
+        onBack={() => setSelectedEmployee(null)}
+        onEdit={(emp) => { setSelectedEmployee(null); setSelected(emp); setModal(true) }}
+        idx={empIdx >= 0 ? empIdx : 0}
+      />
+    )
+  }
 
   const activeEmps = employees.filter(e => e.status === "active")
   const totalBaseSalary = activeEmps.reduce((s, e) => s + e.baseSalary, 0)
@@ -634,12 +1032,12 @@ export default function EmployeesPage() {
                       onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "var(--bg-glass)"}
                       onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = "transparent"}>
                       <td className="px-4 py-3.5">
-                        <div className="flex items-center gap-2.5">
+                        <div className="flex items-center gap-2.5 cursor-pointer" onClick={() => setSelectedEmployee(emp)}>
                           <div className="w-9 h-9 rounded-2xl flex items-center justify-center text-sm font-bold text-white"
                             style={{ background: GRADIENTS[idx % GRADIENTS.length] }}>
                             {emp.name.charAt(0)}
                           </div>
-                          <p className="font-semibold text-sm" style={{ color: "var(--text-primary)" }}>{emp.name}</p>
+                          <p className="font-semibold text-sm hover:underline" style={{ color: "var(--text-primary)" }}>{emp.name}</p>
                         </div>
                       </td>
                       <td className="px-4 py-3.5 text-xs" style={{ color: "var(--text-secondary)" }}>{emp.position || "—"}</td>
@@ -649,7 +1047,13 @@ export default function EmployeesPage() {
                           {emp.commissionPercent}%
                         </span>
                       </td>
-                      <td className="px-4 py-3.5 font-semibold tabular-nums" style={{ color: "var(--text-primary)" }}>{allB.length}</td>
+                      <td className="px-4 py-3.5">
+                        <button onClick={() => setSelectedEmployee(emp)}
+                          className="font-semibold tabular-nums text-sm hover:underline"
+                          style={{ color: "#6366f1" }}>
+                          {allB.length}
+                        </button>
+                      </td>
                       <td className="px-4 py-3.5 font-semibold tabular-nums" style={{ color: "#22c55e" }}>{formatCurrency(allB.reduce((s, b) => s + b.sellPrice, 0))}</td>
                       <td className="px-4 py-3.5 text-xs" style={{ color: "var(--text-secondary)" }}>{emp.phone || "—"}</td>
                       <td className="px-4 py-3.5">
@@ -660,8 +1064,12 @@ export default function EmployeesPage() {
                       </td>
                       <td className="px-4 py-3.5">
                         <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
-                          <button onClick={() => { setSelected(emp); setModal(true) }}
+                          <button onClick={() => setSelectedEmployee(emp)}
                             className="p-1.5 rounded-xl" style={{ color: "#6366f1", background: "rgba(99,102,241,0.1)" }}>
+                            <Eye size={13} />
+                          </button>
+                          <button onClick={() => { setSelected(emp); setModal(true) }}
+                            className="p-1.5 rounded-xl" style={{ color: "var(--text-secondary)", background: "var(--bg-glass)" }}>
                             <Edit3 size={13} />
                           </button>
                           <button onClick={() => handleDelete(emp.id)}
