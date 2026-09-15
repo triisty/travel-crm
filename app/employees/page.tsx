@@ -120,7 +120,7 @@ function EmployeeDetail({ emp, bookings, allPayments, onBack, onEdit, idx }: {
 
   const totalRev    = myBookings.reduce((s, b) => s + b.sellPrice, 0)
   const totalBuy    = myBookings.reduce((s, b) => s + b.buyPrice, 0)
-  const grossProfit = myBookings.reduce((s, b) => s + b.profit + b.commissionAmount, 0)
+  const grossProfit = myBookings.filter(b => (b.commissionPercent ?? 0) > 0).reduce((s, b) => s + b.profit + b.commissionAmount, 0)
   const totalBonus  = grossProfit > 0 ? Math.round(grossProfit * (emp.commissionPercent / 100) * 100) / 100 : 0
   const totalProfit = myBookings.reduce((s, b) => s + b.profit, 0)
   const unpaidCount = myBookings.filter(b => b.paymentStatus !== "paid").length
@@ -264,7 +264,8 @@ function EmployeeDetail({ emp, bookings, allPayments, onBack, onEdit, idx }: {
               <tbody>
                 {myBookings.map(b => {
                   const gross = b.profit + b.commissionAmount
-                  const bBonus = gross > 0 ? Math.round(gross * (emp.commissionPercent / 100) * 100) / 100 : 0
+                  const bBonus = (b.commissionPercent ?? 0) > 0 && gross > 0
+                    ? Math.round(gross * (emp.commissionPercent / 100) * 100) / 100 : 0
                   return (
                     <tr key={b.id} className="group transition-all" style={{ borderBottom: "1px solid var(--border-color)" }}
                       onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "var(--bg-hover)"}
@@ -547,7 +548,8 @@ export default function EmployeesPage() {
   // Calculate real commission from bookings for a month
   function calcRealCommission(emp: Employee, month: string) {
     const mb = getMonthBookings(emp.name, month)
-    const gross = mb.reduce((s, b) => s + b.profit + b.commissionAmount, 0)
+    const gross = mb.filter(b => (b.commissionPercent ?? 0) > 0)
+      .reduce((s, b) => s + b.profit + b.commissionAmount, 0)
     if (gross <= 0) return 0
     return Math.round(gross * (emp.commissionPercent / 100) * 100) / 100
   }
@@ -585,7 +587,7 @@ export default function EmployeesPage() {
 
     const totalRevenue = filteredBookings.reduce((s, b) => s + b.sellPrice, 0)
     const totalBuy     = filteredBookings.reduce((s, b) => s + b.buyPrice, 0)
-    const grossProfit  = filteredBookings.reduce((s, b) => s + b.profit + b.commissionAmount, 0)
+    const grossProfit  = filteredBookings.filter(b => (b.commissionPercent ?? 0) > 0).reduce((s, b) => s + b.profit + b.commissionAmount, 0)
     const totalBonus   = grossProfit > 0 ? Math.round(grossProfit * (emp.commissionPercent / 100) * 100) / 100 : 0
     const totalProfit  = grossProfit - totalBonus
 
