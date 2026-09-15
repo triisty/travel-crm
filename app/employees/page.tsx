@@ -567,7 +567,7 @@ export default function EmployeesPage() {
       const mb = getMonthBookings(emp.name, m)
       totalBookings += mb.length
       totalRevenue += mb.reduce((s, b) => s + b.sellPrice, 0)
-      totalProfit += mb.reduce((s, b) => s + b.profit + b.commissionAmount, 0)
+      totalProfit += mb.reduce((s, b) => s + b.profit, 0)
     }
     return { totalSalary, totalBonus, totalPaid, totalBookings, totalRevenue, totalProfit, months }
   }
@@ -589,7 +589,7 @@ export default function EmployeesPage() {
     const totalBuy     = filteredBookings.reduce((s, b) => s + b.buyPrice, 0)
     const grossProfit  = filteredBookings.filter(b => (b.commissionPercent ?? 0) > 0).reduce((s, b) => s + b.profit + b.commissionAmount, 0)
     const totalBonus   = grossProfit > 0 ? Math.round(grossProfit * (emp.commissionPercent / 100) * 100) / 100 : 0
-    const totalProfit  = grossProfit - totalBonus
+    const totalProfit  = filteredBookings.reduce((s, b) => s + b.profit, 0)
 
     // Get months in range for salary
     const months: string[] = []
