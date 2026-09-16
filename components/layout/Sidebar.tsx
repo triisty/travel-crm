@@ -8,7 +8,7 @@ import {
   Settings, HelpCircle, LogOut, BotMessageSquare, Users,
   PlaneTakeoff, Building2, Scale, Clock, MessageCircle,
   ChevronRight, ChevronLeft, FileText, User, Activity, Trophy,
-  Menu, X, ChevronDown
+  Menu, X, ChevronDown, Lock
 } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import { useUserRole } from "@/lib/hooks/useUserRole"
