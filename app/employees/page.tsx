@@ -204,6 +204,8 @@ function EmployeeDetail({ emp, bookings, allPayments, onBack, onEdit, idx }: {
     a.click()
     URL.revokeObjectURL(url)
   }
+
+  function openEdit(b: any) {
     setEditForm({
       clientName: b.clientName ?? "", clientPhone: b.clientPhone ?? "",
       destination: b.destination ?? "", departureDate: b.departureDate ?? "",
