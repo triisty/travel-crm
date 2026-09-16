@@ -1,12 +1,15 @@
-﻿import type { Booking, BookingFormData } from '../types'
+import type { Booking, BookingFormData } from '../types'
 
 export function calcCommissionAmount(sellPrice: number, commissionPercent: number, buyPrice: number = 0): number {
   const grossProfit = sellPrice - buyPrice
+  if (grossProfit <= 0 || commissionPercent <= 0) return 0
   return Math.round((grossProfit * commissionPercent) / 100 * 100) / 100
 }
 
 export function calcProfit(sellPrice: number, buyPrice: number, commissionAmount: number): number {
-  return Math.round((sellPrice - buyPrice) * 100) / 100
+  // Profit = grossProfit - commissionAmount (agent's share)
+  const grossProfit = sellPrice - buyPrice
+  return Math.round((grossProfit - commissionAmount) * 100) / 100
 }
 
 export function applyCalculations(data: BookingFormData): Omit<Booking, 'id' | 'createdAt' | 'updatedAt'> {

@@ -120,7 +120,7 @@ function EmployeeDetail({ emp, bookings, allPayments, onBack, onEdit, idx }: {
 
   const totalRev    = myBookings.reduce((s, b) => s + b.sellPrice, 0)
   const totalBuy    = myBookings.reduce((s, b) => s + b.buyPrice, 0)
-  const grossProfit = myBookings.filter(b => (b.commissionPercent ?? 0) > 0).reduce((s, b) => s + b.profit + b.commissionAmount, 0)
+  const grossProfit = myBookings.filter(b => (b.commissionPercent ?? 0) > 0 && (b.profit + b.commissionAmount) > 0).reduce((s, b) => s + b.profit + b.commissionAmount, 0)
   const totalBonus  = grossProfit > 0 ? Math.round(grossProfit * (emp.commissionPercent / 100) * 100) / 100 : 0
   const totalProfit = myBookings.reduce((s, b) => s + b.profit, 0)
   const unpaidCount = myBookings.filter(b => b.paymentStatus !== "paid").length
@@ -130,9 +130,9 @@ function EmployeeDetail({ emp, bookings, allPayments, onBack, onEdit, idx }: {
     const STA: Record<string,string> = { confirmed: "Təsdiqlənib", pending: "Gözləyir", completed: "Tamamlandı", cancelled: "Ləğv edildi" }
 
     const rows = myBookings.map((b, i) => {
-      const gross = b.profit + b.commissionAmount
-      const bBonus = (b.commissionPercent ?? 0) > 0 && gross > 0
-        ? Math.round(gross * (emp.commissionPercent / 100) * 100) / 100 : 0
+      const bGross = b.profit + b.commissionAmount
+      const bBonus = (b.commissionPercent ?? 0) > 0 && bGross > 0
+        ? Math.round(bGross * (emp.commissionPercent / 100) * 100) / 100 : 0
       return [
         i + 1,
         b.clientName ?? "",
@@ -350,9 +350,9 @@ function EmployeeDetail({ emp, bookings, allPayments, onBack, onEdit, idx }: {
               </thead>
               <tbody>
                 {myBookings.map(b => {
-                  const gross = b.profit + b.commissionAmount
-                  const bBonus = (b.commissionPercent ?? 0) > 0 && gross > 0
-                    ? Math.round(gross * (emp.commissionPercent / 100) * 100) / 100 : 0
+                  const bGross = b.profit + b.commissionAmount
+                  const bBonus = (b.commissionPercent ?? 0) > 0 && bGross > 0
+                    ? Math.round(bGross * (emp.commissionPercent / 100) * 100) / 100 : 0
                   return (
                     <tr key={b.id} className="group transition-all" style={{ borderBottom: "1px solid var(--border-color)" }}
                       onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "var(--bg-hover)"}
@@ -464,7 +464,11 @@ function EmployeeDetail({ emp, bookings, allPayments, onBack, onEdit, idx }: {
                 ["Satış qiyməti", formatCurrency(viewBooking.sellPrice)],
                 ["Alış qiyməti", formatCurrency(viewBooking.buyPrice)],
                 ["Mənfəət", formatCurrency(viewBooking.profit)],
-                [`Bonus (${emp.commissionPercent}%)`, formatCurrency((() => { const g = viewBooking.profit + viewBooking.commissionAmount; return g > 0 ? Math.round(g * emp.commissionPercent / 100 * 100) / 100 : 0 })())],
+                [`Bonus (${emp.commissionPercent}%)`, formatCurrency(
+                  (viewBooking.commissionPercent ?? 0) > 0 && (viewBooking.profit + viewBooking.commissionAmount) > 0
+                    ? Math.round((viewBooking.profit + viewBooking.commissionAmount) * emp.commissionPercent / 100 * 100) / 100
+                    : 0
+                )],
                 ["Ödənilib", formatCurrency(viewBooking.paidAmount ?? 0)],
                 ["Qalıq", formatCurrency(viewBooking.sellPrice - (viewBooking.paidAmount ?? 0))],
               ].map(([label, value]) => (
@@ -635,7 +639,8 @@ export default function EmployeesPage() {
   // Calculate real commission from bookings for a month
   function calcRealCommission(emp: Employee, month: string) {
     const mb = getMonthBookings(emp.name, month)
-    const gross = mb.filter(b => (b.commissionPercent ?? 0) > 0)
+    const gross = mb
+      .filter(b => (b.commissionPercent ?? 0) > 0 && (b.profit + b.commissionAmount) > 0)
       .reduce((s, b) => s + b.profit + b.commissionAmount, 0)
     if (gross <= 0) return 0
     return Math.round(gross * (emp.commissionPercent / 100) * 100) / 100
@@ -674,8 +679,8 @@ export default function EmployeesPage() {
 
     const totalRevenue = filteredBookings.reduce((s, b) => s + b.sellPrice, 0)
     const totalBuy     = filteredBookings.reduce((s, b) => s + b.buyPrice, 0)
-    const grossProfit  = filteredBookings.filter(b => (b.commissionPercent ?? 0) > 0).reduce((s, b) => s + b.profit + b.commissionAmount, 0)
-    const totalBonus   = grossProfit > 0 ? Math.round(grossProfit * (emp.commissionPercent / 100) * 100) / 100 : 0
+    const profitBase   = filteredBookings.filter(b => (b.commissionPercent ?? 0) > 0 && (b.profit + b.commissionAmount) > 0).reduce((s, b) => s + b.profit + b.commissionAmount, 0)
+    const totalBonus   = profitBase > 0 ? Math.round(profitBase * (emp.commissionPercent / 100) * 100) / 100 : 0
     const totalProfit  = filteredBookings.reduce((s, b) => s + b.profit, 0)
 
     // Get months in range for salary
@@ -1064,7 +1069,11 @@ export default function EmployeesPage() {
                             <div className="text-right">
                               <p className="text-xs font-bold" style={{ color: "#22c55e" }}>{formatCurrency(b.sellPrice)}</p>
                               <p className="text-[10px]" style={{ color: "#f59e0b" }}>
-                                +{formatCurrency(Math.round((b.profit + b.commissionAmount) * emp.commissionPercent / 100 * 100) / 100)} bonus
+                                +{formatCurrency(
+                              (b.commissionPercent ?? 0) > 0 && (b.profit + b.commissionAmount) > 0
+                                ? Math.round((b.profit + b.commissionAmount) * emp.commissionPercent / 100 * 100) / 100
+                                : 0
+                            )} bonus
                               </p>
                             </div>
                           </div>
@@ -1281,8 +1290,10 @@ export default function EmployeesPage() {
               {getMonthBookings(bookingsModal.emp.name, bookingsModal.month).length === 0 ? (
                 <div className="py-10 text-center" style={{ color: "var(--text-muted)" }}>Bu ay üçün sifariş yoxdur</div>
               ) : getMonthBookings(bookingsModal.emp.name, bookingsModal.month).map((b: any) => {
-                const gross = b.profit + b.commissionAmount
-                const commission = Math.round(gross * (bookingsModal.emp.commissionPercent / 100) * 100) / 100
+                const bGross = b.profit + b.commissionAmount
+                const commission = (b.commissionPercent ?? 0) > 0 && bGross > 0
+                  ? Math.round(bGross * (bookingsModal.emp.commissionPercent / 100) * 100) / 100
+                  : 0
                 const isPaid = b.commissionPaid
                 return (
                   <div key={b.id} className="flex items-center gap-3 p-3 rounded-2xl transition-all"
