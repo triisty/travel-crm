@@ -8,7 +8,7 @@ import {
   Plus, Trash2, Users, TrendingUp, DollarSign, Award,
   CheckCircle2, Clock, X, ChevronLeft, ChevronRight,
   Edit3, Gift, AlertCircle, Wallet, BarChart3, ClipboardList,
-  Calendar, Star, ArrowLeft, Eye, Search
+  Calendar, Star, ArrowLeft, Eye, Search, Download
 } from "lucide-react"
 
 interface Employee {
@@ -125,7 +125,85 @@ function EmployeeDetail({ emp, bookings, allPayments, onBack, onEdit, idx }: {
   const totalProfit = myBookings.reduce((s, b) => s + b.profit, 0)
   const unpaidCount = myBookings.filter(b => b.paymentStatus !== "paid").length
 
-  function openEdit(b: any) {
+  function exportToExcel() {
+    const PAY: Record<string,string> = { paid: "Ödənilib", partial: "Qismən", unpaid: "Ödənilməyib" }
+    const STA: Record<string,string> = { confirmed: "Təsdiqlənib", pending: "Gözləyir", completed: "Tamamlandı", cancelled: "Ləğv edildi" }
+
+    const rows = myBookings.map((b, i) => {
+      const gross = b.profit + b.commissionAmount
+      const bBonus = (b.commissionPercent ?? 0) > 0 && gross > 0
+        ? Math.round(gross * (emp.commissionPercent / 100) * 100) / 100 : 0
+      return [
+        i + 1,
+        b.clientName ?? "",
+        b.clientPhone ?? "",
+        b.destination ?? "",
+        b.bookingType ?? "",
+        b.departureDate ?? "",
+        b.returnDate ?? "",
+        b.travelers ?? 1,
+        b.vendor ?? "",
+        b.sellPrice ?? 0,
+        b.buyPrice ?? 0,
+        b.profit ?? 0,
+        bBonus,
+        b.paidAmount ?? 0,
+        b.sellPrice - (b.paidAmount ?? 0),
+        PAY[b.paymentStatus] ?? b.paymentStatus,
+        STA[b.status] ?? b.status,
+        b.notes ?? "",
+      ]
+    })
+
+    // Totals row
+    rows.push([
+      "", "CƏMI", "", "", "", "", "", "",  "",
+      myBookings.reduce((s, b) => s + b.sellPrice, 0),
+      myBookings.reduce((s, b) => s + b.buyPrice, 0),
+      myBookings.reduce((s, b) => s + b.profit, 0),
+      totalBonus,
+      myBookings.reduce((s, b) => s + (b.paidAmount ?? 0), 0),
+      myBookings.reduce((s, b) => s + (b.sellPrice - (b.paidAmount ?? 0)), 0),
+      "", "", ""
+    ])
+
+    const headers = [
+      "#", "Müştəri", "Telefon", "İstiqamət", "Növ", "Getmə tarixi", "Qayıdış tarixi",
+      "Səyahətçi", "Vendor", "Satış (AZN)", "Alış (AZN)", "Mənfəət (AZN)",
+      `Bonus ${emp.commissionPercent}% (AZN)`, "Ödənilib (AZN)", "Qalıq (AZN)",
+      "Ödəniş statusu", "Sifariş statusu", "Qeyd"
+    ]
+
+    // Build CSV with BOM for Excel UTF-8
+    const BOM = "\uFEFF"
+    const info = [
+      [`İşçi: ${emp.name}`],
+      [`Vəzifə: ${emp.position || "—"}`],
+      [`Komissiya: ${emp.commissionPercent}%`],
+      [`Əsas maaş: ${emp.baseSalary} AZN`],
+      [`Cəmi sifariş: ${myBookings.length}`],
+      [`Tarix aralığı: ${dateFrom || "—"} — ${dateTo || "—"}`],
+      [],
+    ]
+
+    const allRows = [...info, headers, ...rows]
+    const csv = BOM + allRows.map(row =>
+      row.map(cell => {
+        const s = String(cell ?? "")
+        return s.includes(",") || s.includes('"') || s.includes("\n")
+          ? `"${s.replace(/"/g, '""')}"` : s
+      }).join(",")
+    ).join("\n")
+
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    const date = new Date().toISOString().slice(0, 10)
+    a.href = url
+    a.download = `${emp.name.replace(/\s+/g, "_")}_sifarisler_${date}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
     setEditForm({
       clientName: b.clientName ?? "", clientPhone: b.clientPhone ?? "",
       destination: b.destination ?? "", departureDate: b.departureDate ?? "",
@@ -193,11 +271,18 @@ function EmployeeDetail({ emp, bookings, allPayments, onBack, onEdit, idx }: {
             </p>
           </div>
         </div>
-        <button onClick={() => onEdit(emp)}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-all hover:scale-[1.02]"
-          style={{ background: "linear-gradient(135deg,#6366f1,#8b5cf6)" }}>
-          <Edit3 size={13} />Düzəlt
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={exportToExcel}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all hover:scale-[1.02]"
+            style={{ background: "rgba(34,197,94,0.1)", color: "#22c55e", border: "1px solid rgba(34,197,94,0.25)" }}>
+            <Download size={13} />Excel
+          </button>
+          <button onClick={() => onEdit(emp)}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-all hover:scale-[1.02]"
+            style={{ background: "linear-gradient(135deg,#6366f1,#8b5cf6)" }}>
+            <Edit3 size={13} />Düzəlt
+          </button>
+        </div>
       </div>
 
       {/* KPI */}
