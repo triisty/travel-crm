@@ -699,7 +699,7 @@ export default function EmployeesPage() {
       return s + (p?.salaryPaidAmount ?? 0) + (p?.bonusPaidAmount ?? 0)
     }, 0)
 
-    return { filteredBookings, totalRevenue, totalBuy, grossProfit, totalBonus, totalProfit, totalSalary, totalPaid, months, bookingsCount: filteredBookings.length }
+   return { filteredBookings, totalRevenue, totalBuy, grossProfit: profitBase, totalBonus, totalProfit, totalSalary, totalPaid, months, bookingsCount: filteredBookings.length }
   }
 
   async function handleSavePayment(e: React.FormEvent<HTMLFormElement>) {
