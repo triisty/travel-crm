@@ -327,7 +327,7 @@ function TopExportModal({ managers, onClose }: { managers: any[]; onClose: () =>
     setLoading(true); setAiText("")
     const top3 = managers.slice(0,3).map((m,i) => `${i+1}. ${m.name} — ${formatCurrency(m.revenue)} satış, ${formatCurrency(m.profit)} mənfəət`).join("\n")
     try {
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
+      const res = await fetch("/api/ai", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -604,7 +604,7 @@ function AdminDash({ bookings, cashHistory, profile }: any) {
 function Footer() {
   return (
     <div className="text-center py-4">
-      <a href="https://varktechnologies.com/" target="_blank" rel="noopener noreferrer"
+      <a href="https://varktechnologies.com//" target="_blank" rel="noopener noreferrer"
         className="text-xs transition-all hover:opacity-60" style={{ color:"var(--text-muted)" }}>
         Powered by <span style={{ color:"var(--accent)", fontWeight:700 }}>VARK TECHNOLOGIES</span>
       </a>
