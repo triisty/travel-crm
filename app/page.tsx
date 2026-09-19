@@ -1,5 +1,5 @@
 "use client"
-import { useEffect, useState, useMemo } from "react"
+import { useEffect, useState, useMemo, useRef } from "react"
 import { useBookingsStore } from "@/lib/store/bookingsStore"
 import { usePaymentsStore } from "@/lib/store/paymentsStore"
 import { useUserRole } from "@/lib/hooks/useUserRole"
@@ -316,125 +316,275 @@ function ManagerDash({ bookings, profile }: any) {
 }
 
 // ── TOP Export Modal ──────────────────────────────────────────
-function TopExportModal({ managers, onClose }: { managers: any[]; onClose: () => void }) {
-  const [aiText, setAiText] = useState("")
-  const [loading, setLoading] = useState(false)
-  const [copied, setCopied] = useState(false)
-  const [period, setPeriod] = useState("Bu ay")
-  const MEDALS = ["🥇","🥈","🥉"]
+function TopExportModal({ bookings, onClose }: { bookings: any[]; onClose: () => void }) {
+  const [aiText, setAiText]     = useState("")
+  const [loading, setLoading]   = useState(false)
+  const [imgLoading, setImgLoading] = useState(false)
+  const [period, setPeriod]     = useState<"week"|"month"|"year">("month")
+  const canvasRef               = useRef<HTMLCanvasElement>(null)
+  const now = new Date()
+
+  // Filter bookings by period
+  const filtered = useMemo(() => bookings.filter(b => {
+    const d = new Date(b.createdAt)
+    if (period === "week")  { const w = new Date(now); w.setDate(now.getDate()-7); return d >= w }
+    if (period === "month") return d.getMonth()===now.getMonth() && d.getFullYear()===now.getFullYear()
+    return d.getFullYear() === now.getFullYear()
+  }), [bookings, period])
+
+  // Build ranked managers from filtered bookings
+  const managers = useMemo(() => {
+    const m: any = {}
+    filtered.forEach((b:any) => {
+      if (!b.manager) return
+      if (!m[b.manager]) m[b.manager] = { name: b.manager, revenue: 0, profit: 0, count: 0 }
+      m[b.manager].revenue += b.sellPrice
+      m[b.manager].profit  += b.profit
+      m[b.manager].count   += 1
+    })
+    return Object.values(m).sort((a:any,b:any) => b.revenue - a.revenue).slice(0,10) as any[]
+  }, [filtered])
+
+  const PERIOD_LABEL: Record<string,string> = { week: "Bu həftə", month: "Bu ay", year: "Bu il" }
+
+  // ── Generate canvas image ─────────────────────────────────
+  function generateImage() {
+    const canvas = canvasRef.current
+    if (!canvas || !managers.length) return
+    setImgLoading(true)
+
+    const W = 600, ROW = 56, HEADER = 160, FOOTER = 60
+    const H = HEADER + managers.length * ROW + FOOTER
+    canvas.width = W; canvas.height = H
+    const ctx = canvas.getContext("2d")!
+
+    // Background gradient
+    const bg = ctx.createLinearGradient(0,0,0,H)
+    bg.addColorStop(0, "#0f1117")
+    bg.addColorStop(1, "#141820")
+    ctx.fillStyle = bg
+    ctx.fillRect(0,0,W,H)
+
+    // Top accent bar
+    const bar = ctx.createLinearGradient(0,0,W,0)
+    bar.addColorStop(0,"#e84545"); bar.addColorStop(1,"#f06060")
+    ctx.fillStyle = bar
+    ctx.fillRect(0,0,W,4)
+
+    // Logo
+    ctx.font = "bold 26px -apple-system, Arial"
+    ctx.fillStyle = "#e84545"; ctx.fillText("its", 32, 52)
+    const itsW = ctx.measureText("its").width
+    ctx.fillStyle = "white";   ctx.fillText("tour", 32 + itsW, 52)
+
+    // Date & period badge
+    const dateStr = now.toLocaleDateString("az-AZ",{day:"2-digit",month:"long",year:"numeric"})
+    ctx.font = "500 13px Arial"
+    ctx.fillStyle = "rgba(255,255,255,0.35)"
+    ctx.textAlign = "right"
+    ctx.fillText(dateStr, W-32, 52)
+    ctx.textAlign = "left"
+
+    // Title
+    ctx.font = "bold 18px Arial"
+    ctx.fillStyle = "rgba(255,255,255,0.9)"
+    ctx.fillText(`🏆 TOP Menecerlər — ${PERIOD_LABEL[period]}`, 32, 90)
+
+    // Subtitle
+    ctx.font = "500 13px Arial"
+    ctx.fillStyle = "rgba(255,255,255,0.35)"
+    ctx.fillText(`${managers.length} menecer · ${filtered.length} sifariş`, 32, 115)
+
+    // Divider
+    ctx.strokeStyle = "rgba(255,255,255,0.07)"
+    ctx.lineWidth = 1
+    ctx.beginPath(); ctx.moveTo(32, HEADER-16); ctx.lineTo(W-32, HEADER-16); ctx.stroke()
+
+    // Medals
+    const MEDALS = ["🥇","🥈","🥉"]
+    const ROW_COLORS = [
+      "rgba(245,158,11,0.08)",
+      "rgba(148,163,184,0.05)",
+      "rgba(180,83,9,0.07)",
+    ]
+    const NUM_COLORS = ["#f59e0b","#94a3b8","#cd7f32"]
+
+    managers.forEach((m, i) => {
+      const y = HEADER + i * ROW
+      const isTop3 = i < 3
+
+      // Row background
+      if (isTop3) {
+        ctx.fillStyle = ROW_COLORS[i]
+        roundRect(ctx, 24, y+4, W-48, ROW-8, 12)
+        ctx.fill()
+      }
+
+      // Rank badge
+      if (i < 3) {
+        ctx.font = "20px Arial"
+        ctx.fillText(MEDALS[i], 40, y + ROW/2 + 7)
+      } else {
+        ctx.fillStyle = "rgba(255,255,255,0.15)"
+        roundRect(ctx, 40, y + ROW/2 - 12, 26, 24, 7)
+        ctx.fill()
+        ctx.font = "bold 12px Arial"
+        ctx.fillStyle = "rgba(255,255,255,0.4)"
+        ctx.textAlign = "center"
+        ctx.fillText(String(i+1), 53, y + ROW/2 + 5)
+        ctx.textAlign = "left"
+      }
+
+      // Name
+      ctx.font = `${isTop3?"bold":"500"} 14px Arial`
+      ctx.fillStyle = isTop3 ? "white" : "rgba(255,255,255,0.75)"
+      const nameX = 80
+      const name = m.name.length > 22 ? m.name.slice(0,22)+"…" : m.name
+      ctx.fillText(name, nameX, y + ROW/2 - 4)
+
+      // Count
+      ctx.font = "12px Arial"
+      ctx.fillStyle = "rgba(255,255,255,0.3)"
+      ctx.fillText(`${m.count} sifariş`, nameX, y + ROW/2 + 14)
+
+      // Revenue
+      ctx.font = "bold 14px Arial"
+      ctx.fillStyle = isTop3 ? NUM_COLORS[i] : "rgba(255,255,255,0.7)"
+      ctx.textAlign = "right"
+      const rev = formatCurrency(m.revenue)
+      ctx.fillText(rev, W-32, y + ROW/2 - 4)
+
+      // Profit
+      ctx.font = "bold 12px Arial"
+      ctx.fillStyle = "#22c55e"
+      ctx.fillText(`+${formatCurrency(m.profit)}`, W-32, y + ROW/2 + 14)
+      ctx.textAlign = "left"
+    })
+
+    // Footer
+    const fy = H - FOOTER + 28
+    ctx.strokeStyle = "rgba(255,255,255,0.07)"
+    ctx.beginPath(); ctx.moveTo(32, fy-20); ctx.lineTo(W-32, fy-20); ctx.stroke()
+    ctx.font = "12px Arial"
+    ctx.fillStyle = "rgba(255,255,255,0.2)"
+    ctx.fillText("itstour.az", 32, fy)
+    ctx.textAlign = "right"
+    ctx.fillStyle = "#e84545"
+    ctx.fillText("VARK TECHNOLOGIES", W-32, fy)
+    ctx.textAlign = "left"
+
+    setImgLoading(false)
+  }
+
+  function roundRect(ctx: CanvasRenderingContext2D, x:number, y:number, w:number, h:number, r:number) {
+    ctx.beginPath()
+    ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y); ctx.arcTo(x+w,y,x+w,y+r,r)
+    ctx.lineTo(x+w,y+h-r); ctx.arcTo(x+w,y+h,x+w-r,y+h,r)
+    ctx.lineTo(x+r,y+h); ctx.arcTo(x,y+h,x,y+h-r,r)
+    ctx.lineTo(x,y+r); ctx.arcTo(x,y,x+r,y,r)
+    ctx.closePath()
+  }
+
+  function downloadImage() {
+    const canvas = canvasRef.current; if (!canvas) return
+    const a = document.createElement("a")
+    a.href = canvas.toDataURL("image/png")
+    a.download = `itstour_top_${period}_${now.toISOString().slice(0,10)}.png`
+    a.click()
+  }
+
+  // Auto-generate image when period or managers change
+  useEffect(() => { setTimeout(generateImage, 50) }, [managers, period])
 
   async function generateAI() {
+    if (!managers.length) return
     setLoading(true); setAiText("")
-    const top3 = managers.slice(0,3).map((m,i) => `${i+1}. ${m.name} — ${formatCurrency(m.revenue)} satış, ${formatCurrency(m.profit)} mənfəət`).join("\n")
+    const top3 = managers.slice(0,3).map((m:any,i:number) =>
+      `${i+1}. ${m.name} — ${formatCurrency(m.revenue)} satış, +${formatCurrency(m.profit)} mənfəət`).join("\n")
     try {
       const res = await fetch("/api/ai", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          model: "claude-sonnet-4-6",
-          max_tokens: 1000,
-          messages: [{ role: "user", content: `Sən ITS Tour turizm şirkətinin SMM mütəxəssisisən. ${period} üçün menecer reytinqi:\n\n${top3}\n\nCəmi ${managers.length} menecer iştirak edib.\n\nWhatsApp qrupuna göndərmək üçün motivasiya mesajı yaz:\n- Azərbaycan dilində\n- Emoji istifadə et\n- TOP 3-ü qeyd et\n- Digərləri üçün motivasiya ver\n- Qısa və enerjili (max 10 sətir)\n- ITS Tour adını qeyd et` }]
+          model: "claude-sonnet-4-6", max_tokens: 600,
+          messages: [{ role: "user", content:
+            `ITS Tour turizm şirkəti. ${PERIOD_LABEL[period]} reytinqi:\n\n${top3}\n\nCəmi ${managers.length} menecer.\n\nWhatsApp üçün qısa motivasiya mesajı yaz (Azərbaycan dilində, emojili, max 8 sətir, enerjili).`
+          }]
         })
       })
       const data = await res.json()
-      setAiText(data.content?.[0]?.text ?? "Xəta baş verdi")
+      setAiText(data.content?.[0]?.text ?? "Xəta")
     } catch { setAiText("Xəta baş verdi") }
     setLoading(false)
   }
 
-  function copyAll() {
-    const now = new Date().toLocaleDateString("az-AZ",{day:"2-digit",month:"2-digit",year:"numeric"})
-    let text = `🏆 ITS Tour — Top Menecerlər (${period}, ${now})\n\n`
-    managers.slice(0,10).forEach((m,i) => {
-      const medal = i<3 ? MEDALS[i] : `${i+1}.`
-      text += `${medal} ${m.name} — ${formatCurrency(m.revenue)} satış, +${formatCurrency(m.profit)} mənfəət, ${m.count} sifariş\n`
-    })
-    if (aiText) text += "\n" + aiText
-    text += "\n\n🔴 itstour.az | VARK TECHNOLOGIES"
-    navigator.clipboard.writeText(text)
-    setCopied(true); setTimeout(() => setCopied(false), 2000)
-  }
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.7)", backdropFilter: "blur(8px)" }}>
-      <div className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-3xl"
-        style={{ background: "#0f1117", border: "1px solid rgba(255,255,255,0.1)" }}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background:"rgba(0,0,0,0.75)", backdropFilter:"blur(10px)" }}>
+      <div className="w-full max-w-lg max-h-[92vh] overflow-y-auto rounded-3xl"
+        style={{ background:"#0f1117", border:"1px solid rgba(255,255,255,0.1)", boxShadow:"0 24px 64px rgba(0,0,0,0.5)" }}>
 
         {/* Header */}
-        <div className="flex items-center justify-between p-5 pb-3" style={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-lg font-black" style={{ color: "#e84545" }}>its</span>
-              <span className="text-lg font-black text-white">tour</span>
-            </div>
-            <p className="text-xs mt-0.5" style={{ color: "rgba(255,255,255,0.35)", textTransform: "uppercase", letterSpacing: "0.12em" }}>Menecer Reytinqi</p>
+        <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom:"1px solid rgba(255,255,255,0.07)" }}>
+          <div className="flex items-center gap-2">
+            <Trophy size={16} style={{ color:"#f59e0b" }} />
+            <span className="text-sm font-bold text-white">TOP Export</span>
           </div>
-          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl" style={{ background: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.5)" }}>
-            <X size={15} />
+          <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-lg"
+            style={{ background:"rgba(255,255,255,0.07)", color:"rgba(255,255,255,0.4)" }}>
+            <X size={14} />
           </button>
         </div>
 
-        {/* Period */}
-        <div className="flex gap-1.5 p-4 pb-2">
-          {["Bu həftə","Bu ay","Bu il"].map(p => (
+        {/* Period tabs */}
+        <div className="flex gap-1.5 px-5 py-3">
+          {(["week","month","year"] as const).map(p => (
             <button key={p} onClick={() => setPeriod(p)}
-              className="text-xs font-semibold px-3 py-1.5 rounded-lg transition-all"
-              style={{ background: period===p ? "#e84545" : "rgba(255,255,255,0.07)", color: period===p ? "white" : "rgba(255,255,255,0.4)", border: "1px solid " + (period===p ? "transparent" : "rgba(255,255,255,0.08)") }}>
-              {p}
+              className="flex-1 py-2 rounded-xl text-xs font-bold transition-all"
+              style={{ background:period===p?"#e84545":"rgba(255,255,255,0.06)", color:period===p?"white":"rgba(255,255,255,0.4)", border:"1px solid "+(period===p?"transparent":"rgba(255,255,255,0.08)") }}>
+              {p==="week"?"Həftə":p==="month"?"Ay":"İl"}
             </button>
           ))}
         </div>
 
-        {/* Ranking */}
-        <div className="px-4 pb-2 space-y-1">
-          {managers.slice(0,10).map((m,i) => {
-            const colors = ["#f59e0b","#94a3b8","#b45309"]
-            const medal = i<3 ? ["🥇","🥈","🥉"][i] : String(i+1)
-            return (
-              <div key={m.name} className="flex items-center gap-3 px-3 py-2.5 rounded-2xl"
-                style={{ background: i===0?"linear-gradient(135deg,rgba(245,158,11,0.12),rgba(245,158,11,0.04))":i===1?"rgba(148,163,184,0.06)":i===2?"rgba(180,83,9,0.08)":"rgba(255,255,255,0.03)", border: i<3?"1px solid rgba(255,255,255,0.07)":"none" }}>
-                <div className="w-7 h-7 rounded-xl flex items-center justify-center text-sm font-black flex-shrink-0"
-                  style={{ background: i<3?colors[i]+"20":"rgba(255,255,255,0.06)", color: i<3?colors[i]:"rgba(255,255,255,0.3)" }}>
-                  {medal}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-bold text-white truncate">{m.name}</p>
-                  <p className="text-xs" style={{ color: "rgba(255,255,255,0.3)" }}>{m.count} sifariş</p>
-                </div>
-                <div className="text-right flex-shrink-0">
-                  <p className="text-sm font-black tabular-nums text-white">{formatCurrency(m.revenue)}</p>
-                  <p className="text-xs font-bold tabular-nums" style={{ color: "#22c55e" }}>+{formatCurrency(m.profit)}</p>
-                </div>
-              </div>
-            )
-          })}
+        {/* Canvas preview */}
+        <div className="px-5 pb-3">
+          <div className="rounded-2xl overflow-hidden" style={{ border:"1px solid rgba(255,255,255,0.08)" }}>
+            <canvas ref={canvasRef} className="w-full" style={{ display:"block" }} />
+          </div>
+          {managers.length === 0 && (
+            <p className="text-center text-xs py-4" style={{ color:"rgba(255,255,255,0.3)" }}>
+              Bu dövrdə sifariş yoxdur
+            </p>
+          )}
         </div>
 
         {/* AI message */}
         {(aiText || loading) && (
-          <div className="mx-4 mb-3 p-4 rounded-2xl" style={{ background: "rgba(99,102,241,0.1)", border: "1px solid rgba(99,102,241,0.2)" }}>
-            <p className="text-xs font-semibold mb-2" style={{ color: "#818cf8" }}>✨ AI Mesaj</p>
+          <div className="mx-5 mb-3 p-4 rounded-2xl" style={{ background:"rgba(99,102,241,0.1)", border:"1px solid rgba(99,102,241,0.2)" }}>
+            <p className="text-xs font-bold mb-2" style={{ color:"#818cf8" }}>✨ AI Mesaj — WhatsApp üçün</p>
             {loading
-              ? <div className="flex gap-1.5 py-1">{[0,1,2].map(i => <div key={i} className="w-2 h-2 rounded-full" style={{ background: "#6366f1", animation: `bounce 1.2s ${i*0.2}s infinite`, opacity: 0.6 }} />)}</div>
-              : <p className="text-sm leading-relaxed" style={{ color: "rgba(255,255,255,0.8)", whiteSpace: "pre-wrap" }}>{aiText}</p>}
+              ? <div className="flex gap-1.5 py-1">{[0,1,2].map(i=><div key={i} className="w-2 h-2 rounded-full"
+                  style={{ background:"#6366f1", animation:`bounce 1.2s ${i*0.2}s infinite` }} />)}</div>
+              : <p className="text-sm leading-relaxed" style={{ color:"rgba(255,255,255,0.8)", whiteSpace:"pre-wrap" }}>{aiText}</p>}
           </div>
         )}
 
-        {/* Buttons */}
-        <div className="flex gap-2 p-4 pt-2">
-          <button onClick={generateAI} disabled={loading}
-            className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-bold text-white disabled:opacity-50"
-            style={{ background: "linear-gradient(135deg,#6366f1,#8b5cf6)" }}>
-            {loading ? "Yazılır..." : "✨ AI Mesaj"}
+        {/* Actions */}
+        <div className="grid grid-cols-2 gap-2 px-5 pb-5">
+          <button onClick={downloadImage} disabled={!managers.length}
+            className="flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-bold text-white disabled:opacity-30"
+            style={{ background:"linear-gradient(135deg,#e84545,#f06060)", boxShadow:"0 4px 16px rgba(232,69,69,0.3)" }}>
+            📸 Şəkli yüklə
           </button>
-          <button onClick={copyAll}
-            className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-bold"
-            style={{ background: copied?"rgba(34,197,94,0.15)":"rgba(255,255,255,0.08)", color: copied?"#22c55e":"white", border: "1px solid " + (copied?"rgba(34,197,94,0.3)":"rgba(255,255,255,0.1)") }}>
-            {copied ? "✅ Kopyalandı!" : "📋 Kopyala"}
+          <button onClick={generateAI} disabled={loading || !managers.length}
+            className="flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-bold text-white disabled:opacity-30"
+            style={{ background:"linear-gradient(135deg,#6366f1,#8b5cf6)" }}>
+            {loading ? "Yazılır..." : "✨ AI Mesaj"}
           </button>
         </div>
       </div>
-      <style>{`@keyframes bounce{0%,80%,100%{transform:scale(0.7);opacity:0.4}40%{transform:scale(1);opacity:1}}`}</style>
+      <style>{`@keyframes bounce{0%,80%,100%{transform:scale(0.6);opacity:0.3}40%{transform:scale(1);opacity:1}}`}</style>
     </div>
   )
 }
@@ -482,7 +632,7 @@ function AdminDash({ bookings, cashHistory, profile }: any) {
 
   return (
     <div className="p-5 md:p-6" style={{ background:"var(--bg-primary)", minHeight:"100vh" }}>
-      {showTop && <TopExportModal managers={allTimeManagers} onClose={() => setShowTop(false)} />}
+      {showTop && <TopExportModal bookings={bookings} onClose={() => setShowTop(false)} />}
 
       {/* Header */}
       <div className="flex items-start justify-between mb-6">
