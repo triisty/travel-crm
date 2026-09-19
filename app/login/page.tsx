@@ -78,7 +78,7 @@ export default function LoginPage() {
 
         {/* Footer */}
         <div className="relative z-10">
-          <a href="https://varktechnologies.netlify.app/" target="_blank" rel="noopener noreferrer"
+          <a href="https://varktechnologies.com/" target="_blank" rel="noopener noreferrer"
             className="text-xs font-semibold tracking-widest uppercase transition-all hover:opacity-60"
             style={{ color: "rgba(255,255,255,0.2)", letterSpacing: "0.18em" }}>
             VARK TECHNOLOGIES
@@ -194,7 +194,7 @@ export default function LoginPage() {
           {/* Bottom credit */}
           <p className="text-center text-xs mt-6" style={{ color: "#9aa5b4" }}>
             Powered by{" "}
-            <a href="https://varktechnologies.netlify.app/" target="_blank" rel="noopener noreferrer"
+            <a href="https://varktechnologies.com/" target="_blank" rel="noopener noreferrer"
               className="font-semibold transition-all hover:opacity-70"
               style={{ color: "#6b7a8d" }}>
               VARK TECHNOLOGIES

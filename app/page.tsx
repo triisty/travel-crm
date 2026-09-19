@@ -9,7 +9,7 @@ import {
   TrendingUp, TrendingDown, DollarSign, Users, Clock,
   ArrowUpRight, AlertCircle, CheckCircle2, Star,
   Wallet, ArrowRight, Activity, Plane, BarChart3,
-  Trophy, CreditCard, Package
+  Trophy, CreditCard, Package, Share2, X
 } from "lucide-react"
 
 const MONTHS = ["Yan","Fev","Mar","Apr","May","İyn","İyl","Avq","Sen","Okt","Noy","Dek"]
@@ -315,9 +315,134 @@ function ManagerDash({ bookings, profile }: any) {
   )
 }
 
+// ── TOP Export Modal ──────────────────────────────────────────
+function TopExportModal({ managers, onClose }: { managers: any[]; onClose: () => void }) {
+  const [aiText, setAiText] = useState("")
+  const [loading, setLoading] = useState(false)
+  const [copied, setCopied] = useState(false)
+  const [period, setPeriod] = useState("Bu ay")
+  const MEDALS = ["🥇","🥈","🥉"]
+
+  async function generateAI() {
+    setLoading(true); setAiText("")
+    const top3 = managers.slice(0,3).map((m,i) => `${i+1}. ${m.name} — ${formatCurrency(m.revenue)} satış, ${formatCurrency(m.profit)} mənfəət`).join("\n")
+    try {
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-6",
+          max_tokens: 1000,
+          messages: [{ role: "user", content: `Sən ITS Tour turizm şirkətinin SMM mütəxəssisisən. ${period} üçün menecer reytinqi:\n\n${top3}\n\nCəmi ${managers.length} menecer iştirak edib.\n\nWhatsApp qrupuna göndərmək üçün motivasiya mesajı yaz:\n- Azərbaycan dilində\n- Emoji istifadə et\n- TOP 3-ü qeyd et\n- Digərləri üçün motivasiya ver\n- Qısa və enerjili (max 10 sətir)\n- ITS Tour adını qeyd et` }]
+        })
+      })
+      const data = await res.json()
+      setAiText(data.content?.[0]?.text ?? "Xəta baş verdi")
+    } catch { setAiText("Xəta baş verdi") }
+    setLoading(false)
+  }
+
+  function copyAll() {
+    const now = new Date().toLocaleDateString("az-AZ",{day:"2-digit",month:"2-digit",year:"numeric"})
+    let text = `🏆 ITS Tour — Top Menecerlər (${period}, ${now})\n\n`
+    managers.slice(0,10).forEach((m,i) => {
+      const medal = i<3 ? MEDALS[i] : `${i+1}.`
+      text += `${medal} ${m.name} — ${formatCurrency(m.revenue)} satış, +${formatCurrency(m.profit)} mənfəət, ${m.count} sifariş\n`
+    })
+    if (aiText) text += "\n" + aiText
+    text += "\n\n🔴 itstour.az | VARK TECHNOLOGIES"
+    navigator.clipboard.writeText(text)
+    setCopied(true); setTimeout(() => setCopied(false), 2000)
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.7)", backdropFilter: "blur(8px)" }}>
+      <div className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-3xl"
+        style={{ background: "#0f1117", border: "1px solid rgba(255,255,255,0.1)" }}>
+
+        {/* Header */}
+        <div className="flex items-center justify-between p-5 pb-3" style={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-lg font-black" style={{ color: "#e84545" }}>its</span>
+              <span className="text-lg font-black text-white">tour</span>
+            </div>
+            <p className="text-xs mt-0.5" style={{ color: "rgba(255,255,255,0.35)", textTransform: "uppercase", letterSpacing: "0.12em" }}>Menecer Reytinqi</p>
+          </div>
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl" style={{ background: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.5)" }}>
+            <X size={15} />
+          </button>
+        </div>
+
+        {/* Period */}
+        <div className="flex gap-1.5 p-4 pb-2">
+          {["Bu həftə","Bu ay","Bu il"].map(p => (
+            <button key={p} onClick={() => setPeriod(p)}
+              className="text-xs font-semibold px-3 py-1.5 rounded-lg transition-all"
+              style={{ background: period===p ? "#e84545" : "rgba(255,255,255,0.07)", color: period===p ? "white" : "rgba(255,255,255,0.4)", border: "1px solid " + (period===p ? "transparent" : "rgba(255,255,255,0.08)") }}>
+              {p}
+            </button>
+          ))}
+        </div>
+
+        {/* Ranking */}
+        <div className="px-4 pb-2 space-y-1">
+          {managers.slice(0,10).map((m,i) => {
+            const colors = ["#f59e0b","#94a3b8","#b45309"]
+            const medal = i<3 ? ["🥇","🥈","🥉"][i] : String(i+1)
+            return (
+              <div key={m.name} className="flex items-center gap-3 px-3 py-2.5 rounded-2xl"
+                style={{ background: i===0?"linear-gradient(135deg,rgba(245,158,11,0.12),rgba(245,158,11,0.04))":i===1?"rgba(148,163,184,0.06)":i===2?"rgba(180,83,9,0.08)":"rgba(255,255,255,0.03)", border: i<3?"1px solid rgba(255,255,255,0.07)":"none" }}>
+                <div className="w-7 h-7 rounded-xl flex items-center justify-center text-sm font-black flex-shrink-0"
+                  style={{ background: i<3?colors[i]+"20":"rgba(255,255,255,0.06)", color: i<3?colors[i]:"rgba(255,255,255,0.3)" }}>
+                  {medal}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold text-white truncate">{m.name}</p>
+                  <p className="text-xs" style={{ color: "rgba(255,255,255,0.3)" }}>{m.count} sifariş</p>
+                </div>
+                <div className="text-right flex-shrink-0">
+                  <p className="text-sm font-black tabular-nums text-white">{formatCurrency(m.revenue)}</p>
+                  <p className="text-xs font-bold tabular-nums" style={{ color: "#22c55e" }}>+{formatCurrency(m.profit)}</p>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+
+        {/* AI message */}
+        {(aiText || loading) && (
+          <div className="mx-4 mb-3 p-4 rounded-2xl" style={{ background: "rgba(99,102,241,0.1)", border: "1px solid rgba(99,102,241,0.2)" }}>
+            <p className="text-xs font-semibold mb-2" style={{ color: "#818cf8" }}>✨ AI Mesaj</p>
+            {loading
+              ? <div className="flex gap-1.5 py-1">{[0,1,2].map(i => <div key={i} className="w-2 h-2 rounded-full" style={{ background: "#6366f1", animation: `bounce 1.2s ${i*0.2}s infinite`, opacity: 0.6 }} />)}</div>
+              : <p className="text-sm leading-relaxed" style={{ color: "rgba(255,255,255,0.8)", whiteSpace: "pre-wrap" }}>{aiText}</p>}
+          </div>
+        )}
+
+        {/* Buttons */}
+        <div className="flex gap-2 p-4 pt-2">
+          <button onClick={generateAI} disabled={loading}
+            className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-bold text-white disabled:opacity-50"
+            style={{ background: "linear-gradient(135deg,#6366f1,#8b5cf6)" }}>
+            {loading ? "Yazılır..." : "✨ AI Mesaj"}
+          </button>
+          <button onClick={copyAll}
+            className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-bold"
+            style={{ background: copied?"rgba(34,197,94,0.15)":"rgba(255,255,255,0.08)", color: copied?"#22c55e":"white", border: "1px solid " + (copied?"rgba(34,197,94,0.3)":"rgba(255,255,255,0.1)") }}>
+            {copied ? "✅ Kopyalandı!" : "📋 Kopyala"}
+          </button>
+        </div>
+      </div>
+      <style>{`@keyframes bounce{0%,80%,100%{transform:scale(0.7);opacity:0.4}40%{transform:scale(1);opacity:1}}`}</style>
+    </div>
+  )
+}
+
 // ── Admin Dashboard ────────────────────────────────────────────
 function AdminDash({ bookings, cashHistory, profile }: any) {
   const [period, setPeriod] = useState<"week"|"month"|"year">("month")
+  const [showTop, setShowTop] = useState(false)
   const now = new Date()
   const rev    = bookings.reduce((s:number,b:any)=>s+b.sellPrice,0)
   const cost   = bookings.reduce((s:number,b:any)=>s+b.buyPrice,0)
@@ -349,8 +474,16 @@ function AdminDash({ bookings, cashHistory, profile }: any) {
       .map((b:any)=>({...b,remaining:b.sellPrice-(b.paidAmount??0)}))
       .sort((a:any,b:any)=>b.remaining-a.remaining).slice(0,5),[bookings])
 
+  const allTimeManagers = useMemo(() => {
+    const m:any={}
+    bookings.forEach((b:any)=>{if(!b.manager)return;if(!m[b.manager])m[b.manager]={name:b.manager,revenue:0,profit:0,count:0};m[b.manager].revenue+=b.sellPrice;m[b.manager].profit+=b.profit;m[b.manager].count++})
+    return Object.values(m).sort((a:any,b:any)=>b.revenue-a.revenue)
+  },[bookings])
+
   return (
     <div className="p-5 md:p-6" style={{ background:"var(--bg-primary)", minHeight:"100vh" }}>
+      {showTop && <TopExportModal managers={allTimeManagers} onClose={() => setShowTop(false)} />}
+
       {/* Header */}
       <div className="flex items-start justify-between mb-6">
         <div>
@@ -361,10 +494,17 @@ function AdminDash({ bookings, cashHistory, profile }: any) {
           <h1 className="text-2xl font-black" style={{ color:"var(--text-primary)", letterSpacing:"-0.5px" }}>Dashboard</h1>
           <p className="text-sm mt-0.5 capitalize" style={{ color:"var(--text-muted)" }}>{todayStr()}</p>
         </div>
-        <div className="flex items-center gap-2 px-4 py-2.5 rounded-2xl" style={{ background:"var(--bg-card)", border:"1px solid var(--border-color)" }}>
-          <Package size={13} style={{ color:"var(--text-muted)" }} />
-          <span className="text-sm font-bold" style={{ color:"var(--text-primary)" }}>{bookings.length}</span>
-          <span className="text-xs" style={{ color:"var(--text-muted)" }}>sifariş</span>
+        <div className="flex items-center gap-2">
+          <button onClick={() => setShowTop(true)}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold text-white transition-all hover:scale-[1.02]"
+            style={{ background: "linear-gradient(135deg,#e84545,#f06060)", boxShadow: "0 4px 16px rgba(232,69,69,0.3)" }}>
+            <Trophy size={14} />TOP Export
+          </button>
+          <div className="flex items-center gap-2 px-4 py-2.5 rounded-2xl" style={{ background:"var(--bg-card)", border:"1px solid var(--border-color)" }}>
+            <Package size={13} style={{ color:"var(--text-muted)" }} />
+            <span className="text-sm font-bold" style={{ color:"var(--text-primary)" }}>{bookings.length}</span>
+            <span className="text-xs" style={{ color:"var(--text-muted)" }}>sifariş</span>
+          </div>
         </div>
       </div>
 
@@ -464,7 +604,7 @@ function AdminDash({ bookings, cashHistory, profile }: any) {
 function Footer() {
   return (
     <div className="text-center py-4">
-      <a href="https://varktechnologies.netlify.app/" target="_blank" rel="noopener noreferrer"
+      <a href="https://varktechnologies.com/" target="_blank" rel="noopener noreferrer"
         className="text-xs transition-all hover:opacity-60" style={{ color:"var(--text-muted)" }}>
         Powered by <span style={{ color:"var(--accent)", fontWeight:700 }}>VARK TECHNOLOGIES</span>
       </a>
