@@ -26,7 +26,7 @@ const MAIN_MENU = [
   { href: "/assistant", label: "AI Köməkçi",  icon: BotMessageSquare,section: "menu", roles: ["it_admin","boss","direktor","muhasib","menecer"] },
   { href: "/mir",       label: "MIR Import",  icon: FileText,        section: "menu", roles: ["it_admin","direktor","menecer","bilet_menecer"] },
   { href: "/flights",   label: "TK NDC",      icon: PlaneTakeoff,    section: "menu", roles: ["it_admin","direktor","menecer"] },
-  { href: "/passwords", label: "Parollar", icon: Lock, section: "menu", roles: ["it_admin", "direktor","menecer"] },
+  { href: "/passwords", label: "Parollar", icon: Lock, section: "menu", roles: ["it_admin", "direktor", "smm"] },
 ]
 
 const FINANCE_MENU = [

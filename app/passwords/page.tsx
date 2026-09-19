@@ -27,6 +27,7 @@ const ROLES = [
   { value: "direktor",      label: "Direktor" },
   { value: "boss",          label: "Boss" },
   { value: "tender_menecer",label: "Tender Menecer" },
+  { value: "smm",           label: "SMM" },
   { value: "it_admin",      label: "IT Admin" },
 ]
 
@@ -150,8 +151,8 @@ export default function PasswordsPage() {
   const [userSuccess, setUserSuccess] = useState("")
   const [creatingUser, setCreatingUser] = useState(false)
 
-  const canAccess = ["it_admin", "direktor"].includes(profile?.role ?? "")
-  const canEdit   = profile?.role === "it_admin"
+  const canAccess = ["it_admin", "direktor", "smm"].includes(profile?.role ?? "")
+  const canEdit   = ["it_admin", "direktor", "smm"].includes(profile?.role ?? "")
 
   useEffect(() => { if (canAccess) { fetchPasswords(); fetchUsers() } }, [canAccess])
 
@@ -265,7 +266,7 @@ export default function PasswordsPage() {
   const ROLE_COLORS: Record<string,string> = {
     it_admin:"#e84545", boss:"#e84545", direktor:"#4a90d9",
     muhasib:"#2bb5a0", menecer:"#f59e0b", bilet_menecer:"#7c5cbf",
-    tender_menecer:"#2bb5a0",
+    tender_menecer:"#2bb5a0", smm:"#ec4899",
   }
 
   return (
@@ -301,7 +302,7 @@ export default function PasswordsPage() {
         style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
         {[
           { key: "passwords", label: "🔑 Parollar", count: passwords.length },
-          { key: "users",     label: "👥 İstifadəçilər", count: users.length },
+          ...( ["it_admin","direktor"].includes(profile?.role ?? "") ? [{ key: "users", label: "👥 İstifadəçilər", count: users.length }] : []),
         ].map(t => (
           <button key={t.key} onClick={() => setTab(t.key as any)}
             className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all"
