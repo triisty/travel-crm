@@ -228,9 +228,32 @@ function PageSkeleton() {
 function ManagerDash({ bookings, profile }: any) {
   const my    = bookings.filter((b:any) => b.manager === profile?.fullName)
   const rev   = my.reduce((s:number,b:any) => s+b.sellPrice, 0)
-  const gross = my.filter((b:any) => (b.commissionPercent??0)>0 && (b.profit+b.commissionAmount)>0).reduce((s:number,b:any) => s+b.profit+b.commissionAmount, 0)
+  const gross = my.filter((b:any) => (b.commissionPercent??0)>0 && (b.profit+b.commissionAmount)>0)
+                  .reduce((s:number,b:any) => s+b.profit+b.commissionAmount, 0)
   const bonus = gross > 0 ? Math.round(gross * 0.10 * 100)/100 : 0
   const profit= my.reduce((s:number,b:any) => s+b.profit, 0)
+
+  // All managers ranking — current month
+  const now = new Date()
+  const allManagers = useMemo(() => {
+    const m:any = {}
+    bookings.forEach((b:any) => {
+      if (!b.manager) return
+      const d = new Date(b.createdAt)
+      if (d.getMonth() !== now.getMonth() || d.getFullYear() !== now.getFullYear()) return
+      if (!m[b.manager]) m[b.manager] = { name: b.manager, revenue: 0, profit: 0, gross: 0, count: 0 }
+      m[b.manager].revenue += b.sellPrice
+      m[b.manager].profit  += b.profit
+      if ((b.commissionPercent??0)>0 && (b.profit+b.commissionAmount)>0)
+        m[b.manager].gross += b.profit + b.commissionAmount
+      m[b.manager].count   += 1
+    })
+    return Object.values(m).sort((a:any,b:any) => b.revenue - a.revenue) as any[]
+  }, [bookings])
+
+  const myRank = allManagers.findIndex((m:any) => m.name === profile?.fullName) + 1
+  const myMonthData = allManagers.find((m:any) => m.name === profile?.fullName)
+  const myMonthBonus = myMonthData?.gross > 0 ? Math.round(myMonthData.gross * 0.10 * 100)/100 : 0
 
   const topDebts = useMemo(() =>
     my.filter((b:any) => b.paymentStatus !== "paid" && b.sellPrice-(b.paidAmount??0) > 0)
@@ -243,12 +266,16 @@ function ManagerDash({ bookings, profile }: any) {
     return Object.entries(m).map(([name,s]:any) => ({name,...s})).sort((a:any,b:any) => b.revenue-a.revenue).slice(0,5)
   }, [my])
 
+  const MEDAL_EMOJI = ["🥇","🥈","🥉"]
+  const MEDAL_COLORS = ["#f59e0b","#94a3b8","#b45309"]
+
   return (
     <div className="p-5 md:p-6" style={{ background:"var(--bg-primary)", minHeight:"100vh" }}>
+
       {/* Header */}
       <div className="mb-6">
         <div className="flex items-center gap-2 mb-1">
-          <div className="w-2 h-2 rounded-full" style={{ background: "var(--success)" }} />
+          <div className="w-2 h-2 rounded-full animate-pulse" style={{ background: "var(--success)" }} />
           <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Şəxsi panel</span>
         </div>
         <h1 className="text-2xl font-black" style={{ color:"var(--text-primary)", letterSpacing:"-0.5px" }}>
@@ -263,7 +290,7 @@ function ManagerDash({ bookings, profile }: any) {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
         <MetricCard label="Sifarişlərim" value={my.length} sub={`${my.filter((b:any)=>b.status==="confirmed").length} təsdiqlənib`} icon={Package} gradient="linear-gradient(135deg,#e84545,#f06060)" color="#e84545" />
         <MetricCard label="Satış həcmim" value={formatCurrency(rev)} icon={TrendingUp} color="var(--success)" />
-        <MetricCard label="Bonusum" value={formatCurrency(bonus)} icon={DollarSign} color="var(--warning)" />
+        <MetricCard label="Bu ay bonusum" value={formatCurrency(myMonthBonus)} icon={DollarSign} color="var(--warning)" />
         <MetricCard label="Mənfəətim" value={formatCurrency(profit)} icon={ArrowUpRight} color="var(--info)" />
       </div>
 
@@ -272,6 +299,123 @@ function ManagerDash({ bookings, profile }: any) {
         <StatPill label="Gözləyir" value={my.filter((b:any)=>b.status==="pending").length} color="var(--warning)" />
         <StatPill label="Ödənilməyib" value={my.filter((b:any)=>b.paymentStatus!=="paid").length} color="var(--danger)" />
         <StatPill label="Cəmi sifariş" value={my.length} color="var(--accent)" />
+      </div>
+
+      {/* MY RANK HERO + LEADERBOARD */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-5">
+
+        {/* My rank card */}
+        <div className="rounded-2xl p-5 flex flex-col justify-between"
+          style={{ background:"linear-gradient(145deg,#1a1f2e,#141820)", border:"1px solid rgba(255,255,255,0.08)" }}>
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wider mb-4" style={{ color:"rgba(255,255,255,0.35)" }}>Bu ay mənim yerim</p>
+            {myRank > 0 ? (
+              <>
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-4xl"
+                    style={{ background: myRank<=3 ? MEDAL_COLORS[myRank-1]+"20" : "rgba(255,255,255,0.06)" }}>
+                    {myRank <= 3 ? MEDAL_EMOJI[myRank-1] : `#${myRank}`}
+                  </div>
+                  <div>
+                    <p className="text-3xl font-black text-white">{myRank <= 3 ? `${myRank}-ci` : `${myRank}-ci`}</p>
+                    <p className="text-sm" style={{ color:"rgba(255,255,255,0.4)" }}>{allManagers.length} menecer arasında</p>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span style={{ color:"rgba(255,255,255,0.4)" }}>Bu ay satış</span>
+                    <span className="font-bold text-white">{formatCurrency(myMonthData?.revenue ?? 0)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span style={{ color:"rgba(255,255,255,0.4)" }}>Bu ay bonus</span>
+                    <span className="font-bold" style={{ color:"#22c55e" }}>+{formatCurrency(myMonthBonus)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span style={{ color:"rgba(255,255,255,0.4)" }}>Bu ay sifariş</span>
+                    <span className="font-bold text-white">{myMonthData?.count ?? 0}</span>
+                  </div>
+                </div>
+                {/* Progress to next rank */}
+                {myRank > 1 && (
+                  <div className="mt-4">
+                    <div className="flex justify-between text-xs mb-1" style={{ color:"rgba(255,255,255,0.3)" }}>
+                      <span>{myRank-1}-ci yerə qədər</span>
+                      <span>{formatCurrency(Math.max(0, (allManagers[myRank-2]?.revenue ?? 0) - (myMonthData?.revenue ?? 0)))}</span>
+                    </div>
+                    <div className="h-1.5 rounded-full" style={{ background:"rgba(255,255,255,0.08)" }}>
+                      <div className="h-full rounded-full" style={{
+                        background:"linear-gradient(90deg,#e84545,#f59e0b)",
+                        width: `${Math.min(100, ((myMonthData?.revenue??0) / (allManagers[myRank-2]?.revenue??1)) * 100)}%`
+                      }} />
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="flex flex-col items-center py-6 gap-2">
+                <p className="text-4xl">📊</p>
+                <p className="text-sm text-center" style={{ color:"rgba(255,255,255,0.4)" }}>Bu ay hələ sifariş yoxdur</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Full leaderboard */}
+        <div className="lg:col-span-2 rounded-2xl p-5"
+          style={{ background:"var(--bg-card)", border:"1px solid var(--border-color)" }}>
+          <div className="flex items-center gap-2 mb-4">
+            <Trophy size={14} style={{ color:"var(--warning)" }} />
+            <h3 className="text-sm font-bold" style={{ color:"var(--text-primary)" }}>Bu ay ümumi reytinq</h3>
+            <span className="ml-auto text-xs px-2 py-0.5 rounded-full font-semibold"
+              style={{ background:"var(--bg-hover)", color:"var(--text-muted)" }}>
+              {now.toLocaleDateString("az-AZ",{month:"long",year:"numeric"})}
+            </span>
+          </div>
+          <div className="space-y-1">
+            {allManagers.length === 0 ? (
+              <p className="text-sm text-center py-6" style={{ color:"var(--text-muted)" }}>Bu ay sifariş yoxdur</p>
+            ) : allManagers.map((m:any, i:number) => {
+              const isMe = m.name === profile?.fullName
+              const mBonus = m.gross > 0 ? Math.round(m.gross * 0.10 * 100)/100 : 0
+              return (
+                <div key={m.name}
+                  className="flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all"
+                  style={{
+                    background: isMe
+                      ? "linear-gradient(135deg,rgba(232,69,69,0.12),rgba(232,69,69,0.04))"
+                      : i<3 ? "var(--bg-hover)" : "transparent",
+                    border: isMe ? "1px solid rgba(232,69,69,0.25)" : "1px solid transparent",
+                  }}>
+                  {/* Rank */}
+                  <div className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-black flex-shrink-0"
+                    style={{
+                      background: i<3 ? MEDAL_COLORS[i]+"20" : "var(--bg-hover)",
+                      color: i<3 ? MEDAL_COLORS[i] : "var(--text-muted)",
+                      fontSize: i<3 ? 16 : 12
+                    }}>
+                    {i<3 ? MEDAL_EMOJI[i] : i+1}
+                  </div>
+                  {/* Name */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-bold truncate" style={{ color: isMe ? "var(--accent)" : "var(--text-primary)" }}>
+                        {m.name.split(" ")[0]}
+                        {m.name.split(" ")[1] ? " " + m.name.split(" ")[1] : ""}
+                      </p>
+                      {isMe && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md" style={{ background:"rgba(232,69,69,0.15)", color:"var(--accent)" }}>SİZ</span>}
+                    </div>
+                    <p className="text-xs" style={{ color:"var(--text-muted)" }}>{m.count} sifariş</p>
+                  </div>
+                  {/* Numbers */}
+                  <div className="text-right flex-shrink-0">
+                    <p className="text-sm font-bold tabular-nums" style={{ color:"var(--text-primary)" }}>{formatCurrency(m.revenue)}</p>
+                    <p className="text-xs font-semibold tabular-nums" style={{ color:"#22c55e" }}>+{formatCurrency(mBonus)}</p>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
       </div>
 
       {/* Tables */}
