@@ -151,7 +151,7 @@ export default function PasswordsPage() {
   const [userSuccess, setUserSuccess] = useState("")
   const [creatingUser, setCreatingUser] = useState(false)
 
-  const canAccess = ["it_admin", "direktor", "smm"].includes(profile?.role ?? "")
+  const canAccess = true  // all roles can view passwords
   const canEdit   = ["it_admin", "direktor", "smm"].includes(profile?.role ?? "")
 
   useEffect(() => { if (canAccess) { fetchPasswords(); fetchUsers() } }, [canAccess])
@@ -251,17 +251,7 @@ export default function PasswordsPage() {
   }), [passwords, filterCat, search])
 
   if (!profile) return null
-  if (!canAccess) {
-    return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: "var(--bg-primary)" }}>
-        <div className="text-center p-8">
-          <Shield size={40} style={{ color: "var(--text-muted)", margin: "0 auto 12px" }} />
-          <p className="font-semibold" style={{ color: "var(--text-primary)" }}>Giriş qadağandır</p>
-          <p className="text-sm mt-1" style={{ color: "var(--text-muted)" }}>Bu bölməyə giriş icazəniz yoxdur</p>
-        </div>
-      </div>
-    )
-  }
+  if (!profile) return null
 
   const ROLE_COLORS: Record<string,string> = {
     it_admin:"#e84545", boss:"#e84545", direktor:"#4a90d9",
