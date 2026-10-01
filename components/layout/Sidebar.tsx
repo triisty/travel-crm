@@ -27,6 +27,8 @@ const MAIN_MENU = [
   { href: "/mir",       label: "MIR Import",  icon: FileText,        section: "menu", roles: ["it_admin","direktor","menecer","bilet_menecer"] },
   { href: "/flights",   label: "TK NDC",      icon: PlaneTakeoff,    section: "menu", roles: ["it_admin","direktor","menecer"] },
   { href: "/passwords", label: "Parollar", icon: Lock, section: "menu", roles: ["it_admin", "boss", "direktor", "muhasib", "menecer", "bilet_menecer", "tender_menecer", "smm"] },
+  { href: "/attendance", label: "Davamiyyət", icon: Clock, section: "menu",
+  roles: ["it_admin","boss","direktor","muhasib"] },
 ]
 
 const FINANCE_MENU = [
