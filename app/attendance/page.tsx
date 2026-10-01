@@ -28,6 +28,11 @@ export default function AttendancePage() {
   const [events, setEvents]     = useState<any[]>([])
   const [selectedPerson, setSelectedPerson] = useState<string | null>(null)
   const [date, setDate]         = useState(new Date().toISOString().slice(0, 10))
+  // On mount, find last date with data
+  useEffect(() => {
+    supabase.from("attendance_summary").select("work_date").order("work_date", { ascending: false }).limit(1)
+      .then(({ data }) => { if (data?.[0]?.work_date) setDate(data[0].work_date) })
+  }, [])
   const [syncing, setSyncing]   = useState(false)
   const [syncMsg, setSyncMsg]   = useState("")
   const [diagMsg, setDiagMsg]   = useState("")
