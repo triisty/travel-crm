@@ -27,34 +27,27 @@ function parseFile(text: string): any[] {
 }
 
 function parseHtmlTable(html: string): any[] {
-  const rows: string[][] = []
-  const trRe = /<tr[^>]*>([\s\S]*?)<\/tr>/gi
-  const tdRe = /<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi
-  let trMatch
-  while ((trMatch = trRe.exec(html)) !== null) {
-    const cells: string[] = []
-    let tdMatch
-    const tdReg = new RegExp(tdRe.source, "gi")
-    while ((tdMatch = tdReg.exec(trMatch[1])) !== null) {
-      cells.push(stripHtml(tdMatch[1]))
-    }
-    if (cells.length > 0) rows.push(cells)
-  }
+  // Extract ALL <td> values flat
+  const tdMatches = html.match(/<td[^>]*>([\s\S]*?)<\/td>/gi) ?? []
+  const tds = tdMatches.map(td => stripHtml(td.replace(/<td[^>]*>/i, "").replace(/<\/td>/i, "")))
 
-  // Find header row (contains "Person ID" or "Name")
-  const headerIdx = rows.findIndex(r =>
-    r.some(c => c.toLowerCase().includes("person id") || c.toLowerCase().includes("name"))
-  )
+  // Find header row by locating "Person ID" cell
+  const headerIdx = tds.findIndex(t => t === "Person ID")
   if (headerIdx === -1) return []
 
-  const headers = rows[headerIdx].map(h => h.toLowerCase().trim())
-  return rows.slice(headerIdx + 1)
-    .filter(r => r.length >= 2 && r.some(c => c.trim()))
-    .map(r => {
-      const obj: any = {}
-      headers.forEach((h, i) => { obj[h] = r[i]?.trim() ?? "" })
-      return obj
-    })
+  const COLS = 11  // iVMS exports 11 columns
+  const headers = tds.slice(headerIdx, headerIdx + COLS).map(h => h.toLowerCase())
+  const dataStart = headerIdx + COLS
+  const records: any[] = []
+
+  for (let i = dataStart; i + COLS <= tds.length; i += COLS) {
+    const chunk = tds.slice(i, i + COLS)
+    if (!chunk[0] || chunk[0] === "-") continue
+    const obj: any = {}
+    headers.forEach((h, idx) => { obj[h] = chunk[idx] ?? "" })
+    records.push(obj)
+  }
+  return records
 }
 
 function parseCSV(text: string): any[] {
@@ -94,7 +87,7 @@ function mapRow(row: any): any | null {
   else if (statusLower.includes("check out") || statusLower === "out") eventType = "exit"
 
   return {
-    person_id:     empNo.trim(),
+    person_id:     empNo.trim().replace(/^'/, ""),
     employee_name: empName.trim(),
     event_time:    eventTime,
     event_type:    eventType,
