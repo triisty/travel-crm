@@ -25,8 +25,8 @@ export async function POST(req: NextRequest) {
 
     // ── Insert events (ON CONFLICT DO NOTHING = no dupes) ──
     const rows = events
-      .filter(e => e.personId && e.eventTime)
-      .map(e => ({
+      .filter((e: any) => e.personId && e.eventTime)
+      .map((e: any) => ({
         person_id:     e.personId,
         employee_name: e.employeeName,
         event_time:    e.eventTime,
