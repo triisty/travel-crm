@@ -1,0 +1,14 @@
+{
+  "name": "itstour-hikvision-bridge",
+  "version": "1.0.0",
+  "description": "ITS Tour — Hikvision to CRM bridge",
+  "main": "bridge.js",
+  "scripts": {
+    "start": "node bridge.js",
+    "sync-now": "node bridge.js --once"
+  },
+  "dependencies": {
+    "dotenv": "^16.0.0",
+    "node-fetch": "^2.7.0"
+  }
+}
