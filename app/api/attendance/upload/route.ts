@@ -13,15 +13,55 @@ const supabase = createClient(
 const WORK_START   = process.env.HIKVISION_WORK_START   ?? "09:00"
 const LATE_MINUTES = parseInt(process.env.HIKVISION_LATE_MINUTES ?? "15")
 
+function stripHtml(s: string): string {
+  return s.replace(/<[^>]+>/g, "").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").trim()
+}
+
+function parseFile(text: string): any[] {
+  // iVMS exports HTML disguised as .xls — parse as HTML table
+  if (text.includes("<table") || text.includes("<td")) {
+    return parseHtmlTable(text)
+  }
+  // CSV / TSV fallback
+  return parseCSV(text)
+}
+
+function parseHtmlTable(html: string): any[] {
+  const rows: string[][] = []
+  const trRe = /<tr[^>]*>([\s\S]*?)<\/tr>/gi
+  const tdRe = /<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi
+  let trMatch
+  while ((trMatch = trRe.exec(html)) !== null) {
+    const cells: string[] = []
+    let tdMatch
+    const tdReg = new RegExp(tdRe.source, "gi")
+    while ((tdMatch = tdReg.exec(trMatch[1])) !== null) {
+      cells.push(stripHtml(tdMatch[1]))
+    }
+    if (cells.length > 0) rows.push(cells)
+  }
+
+  // Find header row (contains "Person ID" or "Name")
+  const headerIdx = rows.findIndex(r =>
+    r.some(c => c.toLowerCase().includes("person id") || c.toLowerCase().includes("name"))
+  )
+  if (headerIdx === -1) return []
+
+  const headers = rows[headerIdx].map(h => h.toLowerCase().trim())
+  return rows.slice(headerIdx + 1)
+    .filter(r => r.length >= 2 && r.some(c => c.trim()))
+    .map(r => {
+      const obj: any = {}
+      headers.forEach((h, i) => { obj[h] = r[i]?.trim() ?? "" })
+      return obj
+    })
+}
+
 function parseCSV(text: string): any[] {
   const lines = text.split(/\r?\n/).filter(l => l.trim())
   if (lines.length < 2) return []
-
-  // Detect separator
   const sep = lines[0].includes("\t") ? "\t" : ","
-
   const headers = lines[0].split(sep).map(h => h.trim().replace(/^"|"$/g, "").toLowerCase())
-
   return lines.slice(1).map(line => {
     const vals = line.split(sep).map(v => v.trim().replace(/^"|"$/g, ""))
     const obj: any = {}
@@ -31,28 +71,27 @@ function parseCSV(text: string): any[] {
 }
 
 // Map iVMS column names to our fields
+// Confirmed iVMS columns: Person ID, Name, Department, Time, Attendance Status, Attendance Check Point
 function mapRow(row: any): any | null {
-  // iVMS exports columns like: Employee ID, Name, Time, Status, Device
-  const empNo   = row["employee id"] || row["employee no"] || row["id"] || row["no"] || row["person id"] || ""
+  const empNo   = row["person id"] || row["employee id"] || row["employee no"] || row["id"] || ""
   const empName = row["name"] || row["employee name"] || row["person name"] || ""
   const timeStr = row["time"] || row["authentication time"] || row["date and time"] || row["check time"] || ""
-  const status  = row["status"] || row["attendance status"] || row["type"] || "unknown"
-  const device  = row["device"] || row["device name"] || row["reader"] || ""
+  const status  = row["attendance status"] || row["status"] || row["type"] || "unknown"
+  const device  = row["attendance check point"] || row["device name"] || row["device"] || ""
 
   if (!empNo || !timeStr) return null
 
-  // Parse time — iVMS formats: "2026-10-01 09:02:33" or "01/10/2026 09:02"
   let eventTime: string
   try {
-    eventTime = new Date(timeStr).toISOString()
-    if (isNaN(new Date(timeStr).getTime())) return null
+    const d = new Date(timeStr)
+    if (isNaN(d.getTime())) return null
+    eventTime = d.toISOString()
   } catch { return null }
 
-  // Map status to entry/exit/unknown
   const statusLower = status.toLowerCase()
   let eventType = "unknown"
-  if (statusLower.includes("check in") || statusLower.includes("in") || statusLower.includes("giriş")) eventType = "entry"
-  else if (statusLower.includes("check out") || statusLower.includes("out") || statusLower.includes("çıxış")) eventType = "exit"
+  if (statusLower.includes("check in") || statusLower === "in") eventType = "entry"
+  else if (statusLower.includes("check out") || statusLower === "out") eventType = "exit"
 
   return {
     person_id:     empNo.trim(),
@@ -72,7 +111,7 @@ export async function POST(req: NextRequest) {
     if (!file) return NextResponse.json({ ok: false, error: "No file uploaded" }, { status: 400 })
 
     const text = await file.text()
-    const rows = parseCSV(text)
+    const rows = parseFile(text)
     if (!rows.length) return NextResponse.json({ ok: false, error: "No data found in file" }, { status: 400 })
 
     const events = rows.map(mapRow).filter(Boolean) as any[]
