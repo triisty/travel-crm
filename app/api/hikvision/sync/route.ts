@@ -43,8 +43,8 @@ export async function POST(req: NextRequest) {
     if (insertErr) return NextResponse.json({ ok: false, error: insertErr.message }, { status: 500 })
 
     // ── Rebuild daily summaries for affected dates ──────────
-    const dates = [...new Set(rows.map(r => r.event_time.slice(0, 10)))]
-    const personIds = [...new Set(rows.map(r => r.person_id))]
+    const dates = [...new Set(rows.map((r: any) => r.event_time.slice(0, 10)))]
+    const personIds = [...new Set(rows.map((r: any) => r.person_id))]
     await rebuildSummaries(dates, personIds)
 
     return NextResponse.json({ ok: true, synced: rows.length, dates })
