@@ -8,31 +8,29 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
-const WORK_START      = process.env.HIKVISION_WORK_START    ?? "09:00"
-const LATE_MINUTES    = parseInt(process.env.HIKVISION_LATE_MINUTES ?? "15")
-const TZ_OFFSET       = "+04:00" // Baku time
+const WORK_START   = process.env.HIKVISION_WORK_START   ?? "09:00"
+const LATE_MINUTES = parseInt(process.env.HIKVISION_LATE_MINUTES ?? "15")
+const TZ_OFFSET    = "+04:00"
 
 export async function POST(req: NextRequest) {
   try {
-    // Default: last 24h
-    const body = await req.json().catch(() => ({}))
+    const body  = await req.json().catch(() => ({}))
     const now   = new Date()
-    const start = body.startTime ?? new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString().replace("Z", TZ_OFFSET)
-    const end   = body.endTime   ?? now.toISOString().replace("Z", TZ_OFFSET)
+    const start = (body.startTime as string) ?? new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString().replace("Z", TZ_OFFSET)
+    const end   = (body.endTime   as string) ?? now.toISOString().replace("Z", TZ_OFFSET)
 
     const events = await fetchEvents(start, end)
     if (!events.length) return NextResponse.json({ ok: true, synced: 0, message: "No events" })
 
-    // ── Insert events (ON CONFLICT DO NOTHING = no dupes) ──
-    const rows = events
+    const rows: { person_id: string; employee_name: string; event_time: string; event_type: string; verify_mode: string; raw_event_no: string; device_ip: string | undefined }[] = events
       .filter((e: any) => e.personId && e.eventTime)
       .map((e: any) => ({
-        person_id:     e.personId,
-        employee_name: e.employeeName,
-        event_time:    e.eventTime,
-        event_type:    e.eventType,
-        verify_mode:   e.verifyMode,
-        raw_event_no:  e.rawEventNo,
+        person_id:     e.personId     as string,
+        employee_name: e.employeeName as string,
+        event_time:    e.eventTime    as string,
+        event_type:    e.eventType    as string,
+        verify_mode:   e.verifyMode   as string,
+        raw_event_no:  e.rawEventNo   as string,
         device_ip:     process.env.HIKVISION_IP,
       }))
 
@@ -42,9 +40,8 @@ export async function POST(req: NextRequest) {
 
     if (insertErr) return NextResponse.json({ ok: false, error: insertErr.message }, { status: 500 })
 
-    // ── Rebuild daily summaries for affected dates ──────────
-    const dates = [...new Set(rows.map((r: any) => r.event_time.slice(0, 10) as string))]
-    const personIds = [...new Set(rows.map((r: any) => r.person_id as string))]
+    const dates:     string[] = [...new Set<string>(rows.map(r => r.event_time.slice(0, 10)))]
+    const personIds: string[] = [...new Set<string>(rows.map(r => r.person_id))]
     await rebuildSummaries(dates, personIds)
 
     return NextResponse.json({ ok: true, synced: rows.length, dates })
@@ -77,11 +74,10 @@ async function rebuildSummaries(dates: string[], personIds: string[]) {
         )
       }
 
-      // Late check: compare firstIn time vs WORK_START
       let isLate = false
       if (firstIn) {
-        const inTime    = new Date(firstIn.event_time)
-        const [wH, wM]  = WORK_START.split(":").map(Number)
+        const inTime   = new Date(firstIn.event_time)
+        const [wH, wM] = WORK_START.split(":").map(Number)
         const workStart = new Date(inTime)
         workStart.setHours(wH, wM + LATE_MINUTES, 0, 0)
         isLate = inTime > workStart
